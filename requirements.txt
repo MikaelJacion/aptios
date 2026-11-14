@@ -1,0 +1,7 @@
+anthropic>=2.8
+fastapi>=0.115
+uvicorn[standard]>=0.30
+
+# só para desenvolvimento
+pytest>=8
+httpx
