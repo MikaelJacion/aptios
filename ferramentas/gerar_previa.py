@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from aptios.oficina.aplicacao import Oficina  # noqa: E402
-from aptios.oficina.catalogo import CATALOGO, PACOTES  # noqa: E402
+from aptios.oficina.catalogo import CATALOGO, PACOTES, RIVAIS  # noqa: E402
 from aptios.oficina.infra import ExploradoresEmMemoria, PagamentoDesativado  # noqa: E402
 
 pagina = (Path(__file__).resolve().parent.parent / "aptios/interface/static/oficina.html").read_text(encoding="utf-8")
@@ -18,6 +18,7 @@ oficina = Oficina(CATALOGO, ExploradoresEmMemoria(), PagamentoDesativado(), PACO
 demo = {
     "catalogo": oficina.catalogo_publico(),
     "respostas": {d.id: {"correta": d.correta, "explicacao": d.explicacao} for d in CATALOGO.desafios.values()},
+    "rivais": [{**asdict(r), "pecas": [asdict(c) for c in r.pecas]} for r in RIVAIS],
 }
 pega = lambda padrao: re.search(padrao, pagina, re.S).group(0)
 partes = [

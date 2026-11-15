@@ -84,7 +84,7 @@ body {
 }
 
 .painel { background: var(--painel); border-left: 1px solid var(--linha); display: flex; flex-direction: column; min-height: 0; }
-.abas { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--linha); }
+.abas { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--linha); }
 .aba {
     font: 600 .92rem var(--fonte-titulo); background: none; border: 0; color: var(--suave);
     padding: 12px 4px; cursor: pointer; border-bottom: 3px solid transparent;
@@ -124,6 +124,31 @@ body {
 .opcao:hover:not(:disabled) { border-color: var(--azul); }
 .feito { color: var(--verde); font-weight: 800; font-size: .9rem; }
 
+.filtros { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font: 600 .82rem var(--fonte-titulo); border: 1px solid var(--linha); background: var(--painel); color: var(--tinta); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--tinta); color: var(--painel); border-color: var(--tinta); }
+.nivel { font: 600 .7rem var(--fonte-titulo); text-transform: uppercase; letter-spacing: .06em; border-radius: 6px; padding: 2px 7px; }
+.nivel-facil { background: color-mix(in srgb, var(--verde) 18%, transparent); color: var(--verde); }
+.nivel-medio { background: color-mix(in srgb, var(--amarelo) 35%, transparent); color: var(--tinta); }
+.nivel-dificil { background: color-mix(in srgb, var(--vermelho) 18%, transparent); color: var(--vermelho); }
+.ficha { display: grid; gap: 5px; font-size: .84rem; }
+.ficha-linha { display: grid; grid-template-columns: 92px 1fr 34px; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
+.barra { height: 9px; border-radius: 5px; background: var(--linha); overflow: hidden; }
+.barra > i { display: block; height: 100%; background: var(--azul); border-radius: 5px; transition: width .35s ease; }
+.rival { border: 1px solid var(--linha); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.rival h3 { margin: 0; font: 600 1rem var(--fonte-titulo); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rival p { margin: 0; font-size: .86rem; color: var(--suave); }
+.placar { display: grid; gap: 10px; }
+.lutador { display: grid; gap: 4px; }
+.lutador strong { display: flex; justify-content: space-between; font-family: var(--fonte-titulo); }
+.vida { height: 14px; border-radius: 7px; background: var(--linha); overflow: hidden; }
+.vida > i { display: block; height: 100%; transition: width .3s ease; }
+.vida.voce > i { background: var(--verde); }
+.vida.rival > i { background: var(--vermelho); }
+.relato { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .86rem; }
+.relato li { padding: 4px 8px; border-radius: 7px; background: var(--fundo); }
+.resultado { text-align: center; border: 2px solid var(--amarelo); border-radius: 14px; padding: 14px; display: grid; gap: 8px; }
+.resultado strong { font: 700 1.3rem var(--fonte-titulo); }
 .aviso { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20;
     max-width: min(520px, calc(100% - 32px)); background: var(--tinta); color: var(--fundo); padding: 10px 16px; border-radius: 12px;
     font-size: .92rem; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
@@ -170,6 +195,7 @@ body {
             <button class="aba" role="tab" data-aba="pecas" aria-selected="true">Peças</button>
             <button class="aba" role="tab" data-aba="loja" aria-selected="false">Loja</button>
             <button class="aba" role="tab" data-aba="desafios" aria-selected="false">Desafios</button>
+            <button class="aba" role="tab" data-aba="arena" aria-selected="false">Arena</button>
             <button class="aba" role="tab" data-aba="tokens" aria-selected="false">Tokens</button>
         </nav>
         <div class="conteudo" id="conteudo"></div>
@@ -215,15 +241,47 @@ function apiServidor() {
         comprar: (id) => req('POST', '/pecas/' + id),
         salvarRobo: (pecas) => req('PUT', '/robo', { pecas }),
         comprarTokens: (id) => req('POST', '/tokens/' + id),
+        arena: () => req('GET', '/arena'),
+        batalhar: (id) => req('POST', '/batalhas/' + id),
         modelo: (id) => '/static/modelos/' + id + '.glb',
     };
 }
 
-function apiDemo({ catalogo, respostas }) {
+function apiDemo({ catalogo, respostas, rivais }) {
     const pecas = Object.fromEntries(catalogo.pecas.map(p => [p.id, p]));
+    // ⚠️ Cópia das fórmulas de aptios/oficina/batalha.py, SÓ para a prévia sem servidor.
+    // No site de verdade, quem calcula é o Python. Mudou lá? Mude aqui também.
+    function atributosJS(lista) {
+        const ps = lista.map(c => pecas[c.peca_id]), conta = (...ids) => ps.filter(p => ids.includes(p.id)).length;
+        if (!ps.some(p => p.categoria === 'controlador')) erro('o robô precisa de um controlador para lutar');
+        if (conta('roda_pequena', 'roda_grande') < 2 && !conta('esteira')) erro('o robô precisa de rodas (2 ou mais) ou de uma esteira para lutar');
+        const est = ps.filter(p => p.categoria === 'estrutura'), blocos = est.reduce((t, p) => t + p.tamanho[0] * p.tamanho[2], 0), mot = conta('motor');
+        return {
+            vida: Math.min(60 + blocos * 2 + conta('esteira') * 15, 200),
+            ataque: Math.min(6 + conta('garra') * 9 + conta('servo') * 5 + mot * 3, 60),
+            defesa: Math.min(est.length * 2 + conta('esteira') * 4, 30),
+            velocidade: Math.min(2 + mot * 3 + conta('roda_grande') * 2 - conta('esteira'), 20),
+            precisao: Math.min(55 + conta('sensor_distancia') * 15 + conta('sensor_cor') * 8 + conta('sensor_toque') * 4, 95),
+        };
+    }
+    function lutarJS(voce, rival) {
+        const vida = { voce: voce.vida, rival: rival.vida }, ficha = { voce, rival }, golpes = [];
+        let vez = voce.velocidade > rival.velocidade || (voce.velocidade === rival.velocidade && Math.random() > .5) ? 'voce' : 'rival';
+        for (let n = 0; n < 24; n++) {
+            const alvo = vez === 'voce' ? 'rival' : 'voce', a = ficha[vez], d = ficha[alvo];
+            const acertou = Math.random() * 100 < a.precisao - Math.min(d.velocidade * 1.5, 25);
+            const dano = acertou ? Math.max(2, a.ataque - Math.floor(d.defesa / 3) + Math.floor(Math.random() * 5)) : 0;
+            vida[alvo] = Math.max(0, vida[alvo] - dano);
+            golpes.push({ atacante: vez, acertou, dano, vida_voce: vida.voce, vida_rival: vida.rival });
+            if (!vida[alvo]) break;
+            vez = alvo;
+        }
+        return { golpes, vencedor: vida.voce > vida.rival ? 'voce' : vida.rival > vida.voce ? 'rival' : 'empate' };
+    }
     let e;
     try { e = JSON.parse(ler('aptios_demo')); } catch {}
     e = e || { saldo: 0, pecas: catalogo.pecas.filter(p => p.preco === 0).map(p => p.id), desafios_feitos: [], robo: [] };
+    e.vitorias ??= [];
     const salvar = () => { gravar('aptios_demo', JSON.stringify(e)); return structuredClone(e); };
     const erro = (m) => { throw new Error(m); };
     return {
@@ -245,6 +303,18 @@ function apiDemo({ catalogo, respostas }) {
             return salvar();
         },
         async salvarRobo(lista) { e.robo = lista; return salvar(); },
+        async arena() {
+            let meus = null, problema = null;
+            try { meus = atributosJS(e.robo); } catch (x) { problema = x.message; }
+            return { meus_atributos: meus, problema, rivais: rivais.map(r => ({ ...r, atributos: atributosJS(r.pecas), vencido: e.vitorias.includes(r.id) })) };
+        },
+        async batalhar(id) {
+            const r = rivais.find(x => x.id === id), voce = atributosJS(e.robo), dele = atributosJS(r.pecas);
+            const { golpes, vencedor } = lutarJS(voce, dele);
+            let premio = 0;
+            if (vencedor === 'voce' && !e.vitorias.includes(id)) { e.vitorias.push(id); e.saldo += r.premio; premio = r.premio; }
+            return { voce, rival: dele, golpes, vencedor, premio, ...salvar() };
+        },
         async comprarTokens() { erro('a compra de tokens ainda não está disponível. Por enquanto, ganhe tokens resolvendo desafios! 🧩'); },
         modelo: () => null,
     };
@@ -460,7 +530,7 @@ function destacar(item) {
     item?.obj.traverse(o => { if (o.isMesh && o.material.emissive) { o.userData.brilho ??= o.material.emissive.getHex(); o.material.emissive.setHex(0x661111); } });
 }
 function atualizarMira(ev) {
-    if (sim) return;   // com o robô ligado, a bancada fica travada
+    if (travado()) return;   // com o robô ligado ou lutando, a bancada fica travada
     alvo = calcularAlvo(mirar(ev));
     destacar(modo === 'apagar' ? alvo?.item ?? null : null);
     if (modo === 'apagar') { fantasma.visible = false; return; }
@@ -474,7 +544,7 @@ renderer.domElement.addEventListener('pointermove', atualizarMira);
 renderer.domElement.addEventListener('pointerleave', () => { if (fantasma) fantasma.visible = false; });
 renderer.domElement.addEventListener('pointerdown', ev => inicio = [ev.clientX, ev.clientY]);
 renderer.domElement.addEventListener('pointerup', ev => {
-    if (sim || !inicio || Math.hypot(ev.clientX - inicio[0], ev.clientY - inicio[1]) > 6) return;
+    if (travado() || !inicio || Math.hypot(ev.clientX - inicio[0], ev.clientY - inicio[1]) > 6) return;
     atualizarMira(ev);
     if (!alvo) return;
     if (modo === 'apagar') { tirar(alvo.item); salvarDepois(); }
@@ -494,6 +564,7 @@ $('modo-colocar').onclick = () => escolherModo('colocar');
 $('modo-apagar').onclick = () => escolherModo('apagar');
 $('girar').onclick = girar;
 $('limpar').onclick = () => {
+    if (luta) return;
     if (sim) parar();
     if ($('limpar').dataset.confirmar) { [...robo].forEach(tirar); salvarDepois(); delete $('limpar').dataset.confirmar; $('limpar').textContent = '🗑 Limpar tudo'; return; }
     $('limpar').dataset.confirmar = '1'; $('limpar').textContent = '🗑 Tem certeza?';
@@ -501,7 +572,7 @@ $('limpar').onclick = () => {
 };
 addEventListener('keydown', ev => {
     if (ev.target.closest('input, textarea')) return;
-    if (sim) return;
+    if (travado()) return;
     if (ev.key === 'r' || ev.key === 'R') girar();
     if (ev.key === 'Delete' || ev.key === 'Backspace') escolherModo(modo === 'apagar' ? 'colocar' : 'apagar');
 });
@@ -527,7 +598,8 @@ function salvarDepois() {
 //  • LEDs piscam enquanto o robô está ligado.
 const EIXO_Y = new THREE.Vector3(0, 1, 0);
 const relogio = new THREE.Clock();
-let sim = null;
+let sim = null, luta = null;
+const travado = () => sim || luta;
 
 function diagnosticar() {
     const pecas = robo.map(i => porId()[i.peca_id]);
@@ -538,23 +610,29 @@ function diagnosticar() {
     return null;
 }
 
+// Junta as peças num "veículo" só, que se move inteiro, e descobre a frente dele.
+function montarVeiculo(itens) {
+    const caixa = new THREE.Box3(); itens.forEach(i => caixa.expandByObject(i.obj));
+    const centro = caixa.getCenter(new THREE.Vector3()), tam = caixa.getSize(new THREE.Vector3());
+    const veiculo = new THREE.Group(); veiculo.position.set(centro.x, 0, centro.z); cena.add(veiculo);
+    itens.forEach(i => veiculo.attach(i.obj));
+    // As rodas rolam de lado ao eixo delas. Se houver sensor, a frente é para onde ele olha.
+    const roda = itens.find(i => porId()[i.peca_id].categoria === 'roda');
+    const sensor = itens.find(i => i.peca_id === 'sensor_distancia');
+    const frente = roda && roda.giro % 180 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    if (sensor && new THREE.Vector3(0, 0, 1).applyAxisAngle(EIXO_Y, -sensor.giro * Math.PI / 180).dot(frente) < 0) frente.negate();
+    return { veiculo, frente, tam };
+}
+
 function ligar() {
     const problema = diagnosticar();
     if (problema) { avisar('🔧 ' + problema); return; }
     destacar(null); if (fantasma) fantasma.visible = false;
 
-    // Junta todas as peças num "veículo" só, que se move inteiro.
-    const caixa = new THREE.Box3(); robo.forEach(i => caixa.expandByObject(i.obj));
-    const centro = caixa.getCenter(new THREE.Vector3()), tam = caixa.getSize(new THREE.Vector3());
-    const veiculo = new THREE.Group(); veiculo.position.set(centro.x, 0, centro.z); cena.add(veiculo);
-    robo.forEach(i => veiculo.attach(i.obj));
-
-    // Para onde é a frente? As rodas rolam de lado ao eixo delas.
+    const { veiculo, frente, tam } = montarVeiculo(robo);
     const pega = (f) => robo.filter(i => f(porId()[i.peca_id]));
     const rodas = pega(p => p.categoria === 'roda');
     const sensor = pega(p => p.id === 'sensor_distancia')[0];
-    const frente = rodas[0].giro % 180 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
-    if (sensor && new THREE.Vector3(0, 0, 1).applyAxisAngle(EIXO_Y, -sensor.giro * Math.PI / 180).dot(frente) < 0) frente.negate();
 
     const motores = pega(p => p.categoria === 'motor' && p.id !== 'garra').length;
     let feixe = null;
@@ -612,7 +690,81 @@ function passoDaSimulacao(dt) {
     controles.target.lerp(new THREE.Vector3(v.position.x, 1, v.position.z), .05);
 }
 
-$('ligar').onclick = () => sim ? parar() : ligar();
+$('ligar').onclick = () => { if (!luta) sim ? parar() : ligar(); };
+
+async function salvarAgora() {
+    clearTimeout(salvarDepois.t);
+    eu = await api.salvarRobo(robo.map(({ peca_id, x, y, z, giro }) => ({ peca_id, x, y, z, giro })));
+    $('status').textContent = `Salvo ✓ · ${robo.length} peça${robo.length === 1 ? '' : 's'}`;
+}
+
+// ═════════════════ ARENA: batalha de robôs ═════════════════
+// Quem decide a luta é o SERVIDOR, para ninguém trapacear nos tokens.
+// Aqui a página só "passa o filme" da luta, golpe a golpe.
+const DURACAO_GOLPE = 1.1;
+const anguloDe = (v) => Math.atan2(v.x, v.z);
+const virarPara = (m, alvo) => { m.veiculo.rotation.y = anguloDe(alvo) - anguloDe(m.frente); };
+
+async function comecarLuta(rival) {
+    if (travado()) return;
+    let res;
+    try { await salvarAgora(); res = await api.batalhar(rival.id); }
+    catch (e) { avisar('⚠️ ' + maiuscula(e.message)); return; }
+    destacar(null); if (fantasma) fantasma.visible = false;
+    const meu = montarVeiculo(robo);
+    const itensRival = rival.pecas.map(c => {
+        const p = porId()[c.peca_id], obj = objeto3d(p);
+        posicionar(obj, p, c.x, c.y, c.z, c.giro); cena.add(obj);
+        return { ...c, obj };
+    });
+    const dele = montarVeiculo(itensRival);
+    meu.veiculo.position.set(-6, 0, 0); dele.veiculo.position.set(6, 0, 0);
+    virarPara(meu, new THREE.Vector3(1, 0, 0)); virarPara(dele, new THREE.Vector3(-1, 0, 0));
+    luta = { rival, res, meu, dele, i: 0, t: 0, fim: false, bateu: false, relato: [],
+             vida: { voce: res.voce.vida, rival: res.rival.vida } };
+    controles.target.set(0, 1, 0);
+    ['modo-colocar', 'modo-apagar', 'girar', 'ligar', 'limpar'].forEach(id => $(id).disabled = true);
+    $('status').textContent = '⚔️ Batalha!';
+    aba = 'arena'; desenharPainel();
+}
+
+function passoDaLuta(dt) {
+    const L = luta;
+    L.t += dt;
+    if (L.fim) {   // quem ganhou pula de alegria, quem perdeu tomba
+        const ganhou = { voce: L.meu, rival: L.dele }[L.res.vencedor], perdeu = ganhou === L.meu ? L.dele : ganhou === L.dele ? L.meu : null;
+        if (ganhou) ganhou.veiculo.position.y = Math.abs(Math.sin(L.t * 6)) * .8;
+        if (perdeu) perdeu.veiculo.rotation.z = Math.min(L.t * 2, 1.3) * (perdeu === L.meu ? 1 : -1);
+        return;
+    }
+    const g = L.res.golpes[L.i], sou = g.atacante === 'voce';
+    const atac = sou ? L.meu : L.dele, alvo = sou ? L.dele : L.meu;
+    const xAtac = sou ? -6 : 6, xAlvo = -xAtac, f = L.t / DURACAO_GOLPE;
+    const avanco = f < .4 ? f / .4 : Math.max(0, 1 - (f - .4) / .6);   // vai rápido, volta devagar
+    atac.veiculo.position.x = xAtac + (sou ? 1 : -1) * 3.4 * Math.sin(avanco * Math.PI / 2);
+    alvo.veiculo.position.x = xAlvo + (g.acertou && f > .4 && f < .7 ? Math.sin(L.t * 70) * .18 : 0);
+    if (!L.bateu && f >= .4) {
+        L.bateu = true;
+        L.vida = { voce: g.vida_voce, rival: g.vida_rival };
+        const quem = sou ? 'Você' : L.rival.nome;
+        L.relato.unshift(g.acertou ? `💥 ${quem} acertou: −${g.dano}` : `💨 ${quem} errou!`);
+        if (aba === 'arena') desenharPainel();
+    }
+    if (f >= 1) {
+        atac.veiculo.position.x = xAtac; alvo.veiculo.position.x = xAlvo;
+        L.i++; L.t = 0; L.bateu = false;
+        if (L.i >= L.res.golpes.length) { L.fim = true; eu = L.res; mostrarSaldo(L.res.premio > 0); desenharPainel(); }
+    }
+}
+
+function sairDaLuta() {
+    for (const item of robo) { cena.add(item.obj); posicionar(item.obj, porId()[item.peca_id], item.x, item.y, item.z, item.giro); }
+    cena.remove(luta.meu.veiculo); cena.remove(luta.dele.veiculo);
+    luta = null;
+    ['modo-colocar', 'modo-apagar', 'girar', 'ligar', 'limpar'].forEach(id => $(id).disabled = false);
+    $('status').textContent = `${robo.length} peças na bancada`;
+    desenharPainel();
+}
 
 function redimensionar() {
     const { clientWidth: w, clientHeight: h } = bancada;
@@ -626,6 +778,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
 renderer.setAnimationLoop(() => {
     const dt = Math.min(relogio.getDelta(), .05);
     if (sim) passoDaSimulacao(dt);
+    if (luta) passoDaLuta(dt);
     controles.update(); renderer.render(cena, camera);
 });
 
@@ -663,12 +816,22 @@ function desenharPainel() {
     if (aba === 'desafios') {
         const feitos = new Set(eu.desafios_feitos);
         c.append(el('p', { className: 'explica', textContent: `Acerte para ganhar tokens. Você já resolveu ${feitos.size} de ${catalogo.desafios.length}.` }));
+        const filtros = el('div', { className: 'filtros' });
+        for (const [id, nome] of [['todos', 'Todos'], ['facil', 'Fácil'], ['medio', 'Médio'], ['dificil', 'Difícil']]) {
+            const b = el('button', { className: 'chip', textContent: nome, onclick: () => { nivelFiltro = id; desenharPainel(); } });
+            b.setAttribute('aria-pressed', nivelFiltro === id); filtros.append(b);
+        }
+        c.append(filtros);
         let trilha = null;
-        for (const d of catalogo.desafios) {
+        const lista = catalogo.desafios.filter(d => nivelFiltro === 'todos' || (d.nivel || 'facil') === nivelFiltro)
+            .sort((a, b) => a.trilha.localeCompare(b.trilha) || ORDEM_NIVEL[a.nivel || 'facil'] - ORDEM_NIVEL[b.nivel || 'facil']);
+        for (const d of lista) {
             if (d.trilha !== trilha) { trilha = d.trilha; c.append(el('div', { className: 'trilha', textContent: TRILHAS[trilha] || trilha })); }
             const card = el('div', { className: 'desafio' },
                 el('h3', {}, el('span', { textContent: d.titulo }), el('span', { className: 'premio', textContent: `+${d.recompensa}` })),
+                el('span', { className: 'nivel nivel-' + (d.nivel || 'facil'), textContent: NOMES_NIVEL[d.nivel || 'facil'] }),
                 el('p', { textContent: d.pergunta }));
+            card.querySelector('.nivel').style.justifySelf = 'start';
             if (feitos.has(d.id)) card.append(el('span', { className: 'feito', textContent: '✓ Resolvido' }));
             else {
                 const ops = el('div', { className: 'opcoes' });
@@ -688,6 +851,7 @@ function desenharPainel() {
             c.append(card);
         }
     }
+    if (aba === 'arena') desenharArena(c);
     if (aba === 'tokens') {
         c.append(el('h2', { textContent: 'Pacotes de tokens' }),
             el('p', { className: 'explica', textContent: 'A compra é feita por um adulto responsável. Ainda está em construção: por enquanto, os tokens vêm dos desafios.' }));
@@ -699,7 +863,60 @@ function desenharPainel() {
         }
     }
 }
-document.querySelectorAll('.aba').forEach(b => b.onclick = () => { aba = b.dataset.aba; desenharPainel(); });
+const NOMES_NIVEL = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }, ORDEM_NIVEL = { facil: 0, medio: 1, dificil: 2 };
+let nivelFiltro = 'todos';
+
+const FICHA = [['vida', '❤️ Vida', 200], ['ataque', '🗡 Ataque', 60], ['defesa', '🛡 Defesa', 30], ['velocidade', '⚡ Velocidade', 20], ['precisao', '🎯 Mira', 100]];
+function ficha(a) {
+    const f = el('div', { className: 'ficha' });
+    for (const [k, nome, max] of FICHA) {
+        const barra = el('div', { className: 'barra' }, el('i', { style: `width:${Math.round(100 * a[k] / max)}%` }));
+        f.append(el('div', { className: 'ficha-linha' }, el('span', { textContent: nome }), barra, el('span', { textContent: a[k] + (k === 'precisao' ? '%' : '') })));
+    }
+    return f;
+}
+
+async function desenharArena(c) {
+    if (luta) {
+        const L = luta, pct = (v, max) => `width:${Math.round(100 * v / max)}%`;
+        c.append(el('h2', { textContent: `⚔️ Você × ${L.rival.nome}` }),
+            el('div', { className: 'placar' },
+                el('div', { className: 'lutador' }, el('strong', {}, el('span', { textContent: '🤖 Seu robô' }), el('span', { textContent: `${L.vida.voce} / ${L.res.voce.vida}` })),
+                    el('div', { className: 'vida voce' }, el('i', { style: pct(L.vida.voce, L.res.voce.vida) }))),
+                el('div', { className: 'lutador' }, el('strong', {}, el('span', { textContent: '👾 ' + L.rival.nome }), el('span', { textContent: `${L.vida.rival} / ${L.res.rival.vida}` })),
+                    el('div', { className: 'vida rival' }, el('i', { style: pct(L.vida.rival, L.res.rival.vida) })))));
+        if (L.fim) {
+            const v = L.res.vencedor;
+            c.append(el('div', { className: 'resultado' },
+                el('strong', { textContent: v === 'voce' ? '🏆 Você venceu!' : v === 'rival' ? `😵 ${L.rival.nome} venceu` : '🤝 Empate!' }),
+                el('span', { textContent: v === 'voce' ? (L.res.premio ? `+${L.res.premio} tokens de prêmio!` : 'Revanche vencida! O prêmio só vale na primeira vitória.')
+                    : 'Dica: mais estrutura dá vida, garras dão ataque, motores dão velocidade e sensores melhoram a mira.' }),
+                el('button', { className: 'botao', textContent: '↩ Voltar à bancada', onclick: sairDaLuta })));
+        }
+        c.append(el('ul', { className: 'relato' }, ...L.relato.slice(0, 8).map(t => el('li', { textContent: t }))));
+        return;
+    }
+    c.append(el('p', { className: 'explica', textContent: 'Carregando a Arena…' }));
+    const vez = desenharArena.vez = (desenharArena.vez || 0) + 1;
+    let dados;
+    try { await salvarAgora(); dados = await api.arena(); }
+    catch (e) { c.replaceChildren(el('p', { className: 'explica', textContent: '⚠️ ' + maiuscula(e.message) })); return; }
+    if (aba !== 'arena' || luta || vez !== desenharArena.vez) return;   // trocou de aba ou abriu de novo enquanto carregava
+    c.replaceChildren(el('h2', { textContent: '🤖 Seu robô' }));
+    if (dados.meus_atributos) c.append(ficha(dados.meus_atributos));
+    else c.append(el('p', { className: 'explica', textContent: '🔧 ' + maiuscula(dados.problema) + '. Monte na bancada e volte aqui!' }));
+    c.append(el('p', { className: 'explica', textContent: 'Cada peça muda a ficha: estrutura dá vida e defesa, garras e servos dão ataque, motores dão velocidade e sensores melhoram a mira.' }),
+        el('h2', { textContent: 'Rivais' }));
+    for (const r of dados.rivais) {
+        const b = el('button', { className: 'botao', textContent: '⚔️ Lutar!', disabled: !dados.meus_atributos, onclick: () => comecarLuta(r) });
+        c.append(el('div', { className: 'rival' },
+            el('h3', {}, el('span', { textContent: r.nome }), el('span', { className: 'nivel nivel-' + r.nivel, textContent: NOMES_NIVEL[r.nivel] }),
+                el('span', { className: 'premio', textContent: r.vencido ? '✓ vencido' : `🏆 +${r.premio}` })),
+            el('p', { textContent: r.descricao }), ficha(r.atributos), b));
+    }
+}
+
+document.querySelectorAll('.aba').forEach(b => b.onclick = () => { if (!luta) { aba = b.dataset.aba; desenharPainel(); } });
 
 // ═════════════════════════ COMEÇAR ═════════════════════════
 (async () => {

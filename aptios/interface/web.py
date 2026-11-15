@@ -146,6 +146,16 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
     async def robo(corpo: Robo, x_explorador: str = Header("")) -> dict:
         return executar(oficina.salvar_robo, x_explorador, [p.model_dump() for p in corpo.pecas])
 
+    @app.get("/api/oficina/arena")
+    async def arena(x_explorador: str = Header("")) -> dict:
+        return executar(oficina.arena, x_explorador)
+
+    @app.post("/api/oficina/batalhas/{rival_id}")
+    async def batalha(rival_id: str, request: Request, x_explorador: str = Header("")) -> dict:
+        if not limite.permitir(_quem(request)):
+            raise HTTPException(429, "Muitas batalhas seguidas! Deixe os robôs descansarem um pouco. 🔋")
+        return executar(oficina.batalhar, x_explorador, rival_id)
+
     @app.post("/api/oficina/tokens/{pacote_id}")
     async def tokens(pacote_id: str, x_explorador: str = Header("")) -> dict:
         return executar(oficina.comprar_tokens, x_explorador, pacote_id)
@@ -156,12 +166,12 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
 
 
 def _app_padrao() -> FastAPI:
-    from aptios.oficina.catalogo import CATALOGO, PACOTES
+    from aptios.oficina.catalogo import CATALOGO, PACOTES, RIVAIS
     from aptios.oficina.infra import ExploradoresSQLite, PagamentoDesativado
     from aptios.tutor.claude import TutorClaude
 
     oficina = Oficina(CATALOGO, ExploradoresSQLite(os.environ.get("APTIOS_DB", "aptios.db")),
-                      PagamentoDesativado(), PACOTES)
+                      PagamentoDesativado(), PACOTES, RIVAIS)
     return criar_app(TutorClaude(), oficina)
 
 
