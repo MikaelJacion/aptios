@@ -1,4 +1,26 @@
-# Arquitetura do RoboTutor
+# Arquitetura da Aptios
+
+## Dois contextos delimitados
+
+A Aptios tem dois **contextos delimitados**: o **Tutor** e a **Oficina**. Cada um tem o próprio domínio e o próprio vocabulário. Um não importa nada do outro. Se o tutor mudar, a oficina continua funcionando.
+
+Um exemplo do porquê: a palavra **"token"**. Na Oficina, é a moeda que a criança ganha. No mundo da IA, "token" é um pedaço de palavra. Se tudo estivesse misturado, essa palavra teria dois sentidos no mesmo código. Separando os contextos, cada palavra tem um sentido só dentro do seu contexto. Isso é a **Linguagem Ubíqua**.
+
+## A Oficina
+
+| Peça | Tipo no DDD | Por quê |
+|---|---|---|
+| `Explorador` | **Agregado** (raiz) | Saldo, peças, desafios e robô só mudam pelos métodos dele. Assim ninguém aumenta o saldo sem passar pelas regras. |
+| `Peca`, `Desafio`, `PecaColocada` | **Value Objects** | Não mudam depois de criados. `PecaColocada` recusa giro de 45° e peça fora da bancada. |
+| `Exploradores` | **Repositório** (porta) | Hoje é SQLite. Nos testes, fica em memória. |
+| `Pagamentos` | **Porta** | Hoje é `PagamentoDesativado`. Amanhã pode ser o Mercado Pago, sem mexer no domínio. |
+| `Oficina` | **Serviço de aplicação** | Todo caso de uso segue os mesmos passos: buscar o explorador, aplicar a regra e salvar. |
+
+**Regra de ouro:** as respostas dos desafios **nunca** vão para o navegador (`catalogo_publico`). Quem confere a resposta é o servidor. Se fosse o navegador, qualquer criança poderia abrir o código da página e ver a resposta.
+
+**A mesma porta com dois adaptadores, também no JavaScript:** a página da oficina tem `apiServidor()`, que fala com o Python, e `apiDemo()`, que roda tudo no navegador e serve só para a prévia. O resto da página não sabe qual dos dois está em uso.
+
+# O Tutor
 
 ## A regra da dependência
 
@@ -27,6 +49,9 @@ As setas mostram quem **conhece** quem. O **domínio fica no centro e não conhe
 - **ADR-002: respostas em streaming.** O texto aparece enquanto é escrito, então a criança não fica olhando uma tela parada.
 - **ADR-003: limite de perguntas na interface.** É uma regra de custo e de abuso, não de robótica. Por isso fica fora do domínio.
 - **ADR-004: o prompt fica num arquivo separado (`infra/prompt.py`).** Ele muda com frequência e não deve se misturar com o código que chama a API.
+
+- **ADR-005: o código do explorador vai no cabeçalho `X-Explorador`.** Ele não vai no endereço, para não aparecer no histórico do navegador nem nos registros do servidor. Também não pedimos nome nem e-mail da criança.
+- **ADR-006: a compra com dinheiro está desligada.** Para vender a menores, é preciso uma conta e autorização do responsável, a confirmação do pagamento por webhook e cumprir a LGPD e o ECA Digital. O domínio já tem `creditar_compra()`, e só falta o adaptador.
 
 ## Próximos passos sugeridos
 
