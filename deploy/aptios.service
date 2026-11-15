@@ -1,0 +1,13 @@
+[Unit]
+Description=Aptios (tutor + oficina 3D)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/robotutor
+EnvironmentFile=%h/.config/aptios/env
+ExecStart=%h/robotutor/venv/bin/uvicorn aptios.interface.web:app --host 127.0.0.1 --port 8770 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
