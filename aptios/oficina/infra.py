@@ -36,6 +36,7 @@ class ExploradoresSQLite:
             desafios_feitos=set(d["desafios_feitos"]),
             robo=[PecaColocada(**c) for c in d["robo"]],
             vitorias=set(d.get("vitorias", [])),  # .get: exploradores antigos não tinham
+            robos_salvos={n: [PecaColocada(**c) for c in r] for n, r in d.get("robos_salvos", {}).items()},
         )
 
     def salvar(self, e: Explorador) -> None:
@@ -45,6 +46,7 @@ class ExploradoresSQLite:
             "desafios_feitos": sorted(e.desafios_feitos),
             "robo": [asdict(c) for c in e.robo],
             "vitorias": sorted(e.vitorias),
+            "robos_salvos": {n: [asdict(c) for c in r] for n, r in e.robos_salvos.items()},
         })
         with self._trava:
             self._db.execute(

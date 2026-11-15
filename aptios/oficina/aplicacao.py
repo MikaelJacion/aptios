@@ -79,6 +79,24 @@ class Oficina:
         self.exploradores.salvar(explorador)
         return self._publico(explorador)
 
+    def guardar_robo(self, codigo: str, nome: str) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        explorador.guardar_robo(nome)
+        self.exploradores.salvar(explorador)
+        return self._publico(explorador)
+
+    def carregar_robo(self, codigo: str, nome: str) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        explorador.carregar_robo(nome, self.catalogo)
+        self.exploradores.salvar(explorador)
+        return self._publico(explorador)
+
+    def apagar_robo(self, codigo: str, nome: str) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        explorador.apagar_robo(nome)
+        self.exploradores.salvar(explorador)
+        return self._publico(explorador)
+
     def arena(self, codigo: str) -> dict[str, Any]:
         explorador = self._buscar(codigo)
         try:
@@ -135,4 +153,5 @@ class Oficina:
             "desafios_feitos": sorted(e.desafios_feitos),
             "robo": [asdict(c) for c in e.robo],
             "vitorias": sorted(e.vitorias),
+            "robos_salvos": [{"nome": n, "pecas": len(r)} for n, r in e.robos_salvos.items()],
         }

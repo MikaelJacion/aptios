@@ -111,6 +111,9 @@ def test_limite_de_perguntas():
 
 
 def test_pagina_inicial_abre():
-    r = TestClient(criar_app(TutorFalso(), nova_oficina())).get("/")
-    assert r.status_code == 200 and "RoboTutor" in r.text
+    c = TestClient(criar_app(TutorFalso(), nova_oficina()))
+    inicio = c.get("/").text
+    assert all(link in inicio for link in ('href="/ia"', 'href="/oficina"', 'href="/pista"'))
+    ia = c.get("/ia")
+    assert ia.status_code == 200 and "IA da Aptios" in ia.text and 'data-kit="pista"' in ia.text
     assert "Oficina Aptios" in TestClient(criar_app(TutorFalso(), nova_oficina())).get("/oficina").text

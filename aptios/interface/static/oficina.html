@@ -103,6 +103,11 @@ body {
 .peca[aria-pressed="true"] { border-color: var(--azul); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul) 22%, transparent); }
 .amostra { width: 28px; height: 28px; border-radius: 7px; border: 1px solid rgba(0,0,0,.15); }
 
+.guardar { display: flex; gap: 8px; margin: 10px 0 4px; }
+.guardar input { flex: 1; min-width: 0; font: inherit; border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; background: var(--fundo); color: var(--tinta); }
+.guardar input:focus-visible { outline: 3px solid var(--azul); outline-offset: 1px; }
+.acoes { display: flex; gap: 6px; }
+.botao.pequeno { padding: 6px 10px; font-size: .82rem; }
 .item { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--linha); }
 .item .amostra { width: 36px; height: 36px; }
 .item strong { display: block; }
@@ -176,7 +181,7 @@ body {
     <span class="demo" id="selo-demo" hidden>modo demonstração</span>
     <span class="espaco"></span>
     <a class="link" id="link-pista" href="/pista">🏎 Pista</a>
-    <a class="link" id="link-tutor" href="/">🤖 Tutor</a>
+    <a class="link" id="link-tutor" href="/ia">🤖 IA</a>
     <span class="saldo" id="saldo" title="Seus tokens">⚙ <span id="saldo-num">0</span> tokens</span>
 </header>
 
@@ -196,6 +201,7 @@ body {
     <aside class="painel">
         <nav class="abas" role="tablist">
             <button class="aba" role="tab" data-aba="pecas" aria-selected="true">Peças</button>
+            <button class="aba" role="tab" data-aba="robos" aria-selected="false">Robôs</button>
             <button class="aba" role="tab" data-aba="loja" aria-selected="false">Loja</button>
             <button class="aba" role="tab" data-aba="desafios" aria-selected="false">Desafios</button>
             <button class="aba" role="tab" data-aba="arena" aria-selected="false">Arena</button>
@@ -243,6 +249,9 @@ function apiServidor() {
         desafio: (id, resposta) => req('POST', '/desafios/' + id, { resposta }),
         comprar: (id) => req('POST', '/pecas/' + id),
         salvarRobo: (pecas) => req('PUT', '/robo', { pecas }),
+        guardarRobo: (nome) => req('POST', '/robos/guardar', { nome }),
+        carregarRobo: (nome) => req('POST', '/robos/carregar', { nome }),
+        apagarRobo: (nome) => req('POST', '/robos/apagar', { nome }),
         comprarTokens: (id) => req('POST', '/tokens/' + id),
         arena: () => req('GET', '/arena'),
         batalhar: (id) => req('POST', '/batalhas/' + id),
@@ -296,8 +305,14 @@ function apiDemo({ catalogo, respostas, rivais }) {
     let e;
     try { e = JSON.parse(ler('aptios_demo')); } catch {}
     e = e || { saldo: 0, pecas: catalogo.pecas.filter(p => p.preco === 0).map(p => p.id), desafios_feitos: [], robo: [] };
-    e.vitorias ??= [];
-    const salvar = () => { gravar('aptios_demo', JSON.stringify(e)); return structuredClone(e); };
+    e.vitorias ??= []; e.colecao ??= {};
+    // igual ao _publico() do Python: a coleção vai como lista de { nome, pecas }
+    const salvar = () => {
+        gravar('aptios_demo', JSON.stringify(e));
+        const { colecao, ...resto } = structuredClone(e);
+        return { ...resto, robos_salvos: Object.entries(colecao).map(([nome, r]) => ({ nome, pecas: r.length })) };
+    };
+    const nomeValido = (nome) => { nome = String(nome).split(/\s+/).filter(Boolean).join(' '); if (nome.length < 1 || nome.length > 30) erro('o nome do robô precisa ter de 1 a 30 letras'); return nome; };
     const erro = (m) => { throw new Error(m); };
     return {
         demo: true,
@@ -318,6 +333,14 @@ function apiDemo({ catalogo, respostas, rivais }) {
             return salvar();
         },
         async salvarRobo(lista) { e.robo = lista; return salvar(); },
+        async guardarRobo(nome) {
+            nome = nomeValido(nome);
+            if (!e.robo.length) erro('a bancada está vazia: monte um robô antes de guardar');
+            if (!(nome in e.colecao) && Object.keys(e.colecao).length >= 12) erro('você já tem 12 robôs guardados. Apague um para guardar outro');
+            e.colecao[nome] = structuredClone(e.robo); return salvar();
+        },
+        async carregarRobo(nome) { nome = nomeValido(nome); if (!(nome in e.colecao)) erro('não achei um robô com esse nome'); e.robo = structuredClone(e.colecao[nome]); return salvar(); },
+        async apagarRobo(nome) { nome = nomeValido(nome); if (!(nome in e.colecao)) erro('não achei um robô com esse nome'); delete e.colecao[nome]; return salvar(); },
         async arena() {
             let meus = null, problema = null;
             try { meus = atributosJS(e.robo); } catch (x) { problema = x.message; }
@@ -874,6 +897,7 @@ function desenharPainel() {
         }
         c.append(g);
     }
+    if (aba === 'robos') desenharColecao(c);
     if (aba === 'loja') {
         const aVenda = catalogo.pecas.filter(p => !meus.has(p.id));
         c.append(el('p', { className: 'explica', textContent: aVenda.length ? 'Troque seus tokens por peças novas. Ganhe tokens na aba Desafios.' : 'Você já tem todas as peças! 🏆' }));
@@ -937,6 +961,48 @@ function desenharPainel() {
         }
     }
 }
+// ── coleção de robôs: guardar a bancada com um nome e trazer de volta depois ──
+function desenharColecao(c) {
+    const lista = eu.robos_salvos || [];
+    c.append(el('h2', { textContent: `💾 Meus robôs (${lista.length} de 12)` }),
+        el('p', { className: 'explica', textContent: 'Dê um nome ao robô que está na bancada e guarde. Depois é só carregar para continuar de onde parou. Guardar com um nome que já existe atualiza aquele robô.' }));
+    const campo = el('input', { id: 'nome-robo', maxLength: 30, placeholder: 'Nome do robô (ex.: Trator Bravo 2)', autocomplete: 'off' });
+    campo.setAttribute('aria-label', 'Nome do robô');
+    const guardar = el('button', { className: 'botao', textContent: '💾 Guardar' });
+    const acao = async () => {
+        if (travado()) return;
+        try { await salvarAgora(); eu = await api.guardarRobo(campo.value); avisar(`💾 "${campo.value.trim()}" guardado!`); desenharPainel(); }
+        catch (e) { avisar('⚠️ ' + maiuscula(e.message)); }
+    };
+    guardar.onclick = acao;
+    campo.onkeydown = (ev) => { if (ev.key === 'Enter') acao(); };
+    c.append(el('div', { className: 'guardar' }, campo, guardar));
+    if (!lista.length) { c.append(el('p', { className: 'explica', textContent: 'Você ainda não guardou nenhum robô.' })); return; }
+    for (const r of lista) {
+        const carregar = el('button', { className: 'botao pequeno', textContent: '📂 Carregar' });
+        carregar.onclick = async () => {
+            if (travado()) return;
+            try {
+                eu = await api.carregarRobo(r.nome);
+                [...robo].forEach(tirar);
+                await Promise.allSettled(catalogo.pecas.filter(p => eu.robo.some(c => c.peca_id === p.id)).map(carregarModelo));
+                for (const p of eu.robo) colocar(p.peca_id, p.x, p.y, p.z, p.giro);
+                $('status').textContent = `${robo.length} peças na bancada`;
+                avisar(`📂 "${r.nome}" está na bancada!`);
+            } catch (e) { avisar('⚠️ ' + maiuscula(e.message)); }
+        };
+        const apagar = el('button', { className: 'botao pequeno', textContent: '🗑' });
+        apagar.setAttribute('aria-label', 'Apagar ' + r.nome);
+        apagar.onclick = async () => {   // dois toques para apagar, para não apagar sem querer
+            if (!apagar.dataset.confirmar) { apagar.dataset.confirmar = '1'; apagar.textContent = 'Apagar?'; setTimeout(() => { delete apagar.dataset.confirmar; apagar.textContent = '🗑'; }, 3000); return; }
+            try { eu = await api.apagarRobo(r.nome); desenharPainel(); } catch (e) { avisar('⚠️ ' + maiuscula(e.message)); }
+        };
+        c.append(el('div', { className: 'item' }, el('span', { className: 'amostra', style: 'background:var(--azul)' }),
+            el('div', {}, el('strong', { textContent: r.nome }), el('p', { textContent: `${r.pecas} peça${r.pecas === 1 ? '' : 's'}` })),
+            el('div', { className: 'acoes' }, carregar, apagar)));
+    }
+}
+
 const NOMES_NIVEL = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }, ORDEM_NIVEL = { facil: 0, medio: 1, dificil: 2 };
 let nivelFiltro = 'todos';
 

@@ -49,6 +49,10 @@ class PecaNoRobo(BaseModel):
     giro: int
 
 
+class NomeDoRobo(BaseModel):
+    nome: str = Field(max_length=60)
+
+
 class Robo(BaseModel):
     pecas: list[PecaNoRobo] = Field(max_length=300)
 
@@ -90,8 +94,12 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
 
     # ── páginas ──
     @app.get("/")
-    async def pagina_tutor() -> FileResponse:
-        return FileResponse(PASTA_ESTATICA / "index.html")
+    async def pagina_inicio() -> FileResponse:
+        return FileResponse(PASTA_ESTATICA / "inicio.html")
+
+    @app.get("/ia")
+    async def pagina_ia() -> FileResponse:
+        return FileResponse(PASTA_ESTATICA / "ia.html")
 
     @app.get("/oficina")
     async def pagina_oficina() -> FileResponse:
@@ -155,6 +163,19 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
     @app.put("/api/oficina/robo")
     async def robo(corpo: Robo, x_explorador: str = Header("")) -> dict:
         return executar(oficina.salvar_robo, x_explorador, [p.model_dump() for p in corpo.pecas])
+
+    # coleção de robôs: o nome vai no corpo (e não no endereço) por causa de espaços e acentos
+    @app.post("/api/oficina/robos/guardar")
+    async def guardar(corpo: NomeDoRobo, x_explorador: str = Header("")) -> dict:
+        return executar(oficina.guardar_robo, x_explorador, corpo.nome)
+
+    @app.post("/api/oficina/robos/carregar")
+    async def carregar(corpo: NomeDoRobo, x_explorador: str = Header("")) -> dict:
+        return executar(oficina.carregar_robo, x_explorador, corpo.nome)
+
+    @app.post("/api/oficina/robos/apagar")
+    async def apagar(corpo: NomeDoRobo, x_explorador: str = Header("")) -> dict:
+        return executar(oficina.apagar_robo, x_explorador, corpo.nome)
 
     @app.get("/api/oficina/arena")
     async def arena(x_explorador: str = Header("")) -> dict:

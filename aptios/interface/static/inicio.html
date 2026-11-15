@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aptios</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&display=swap">
+<style>
+/* Layout: a "porta de entrada" da Aptios: três portas grandes, uma para cada parte. */
+:root {
+    --fundo: #e9eef3; --painel: #ffffff; --tinta: #1b2430; --suave: #5d6b7c; --linha: #d3dbe4;
+    --azul: #2a5bd7; --amarelo: #ffcf33; --verde: #1f9d55; --laranja: #e8710a;
+    --fonte-titulo: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    --fonte-texto: "Nunito", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fundo: #11161d; --painel: #1a212b; --tinta: #e9eef5; --suave: #98a6b8; --linha: #2c3644; --azul: #6d93ff; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --fundo: #11161d; --painel: #1a212b; --tinta: #e9eef5; --suave: #98a6b8; --linha: #2c3644; --azul: #6d93ff; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--tinta); font: 17px/1.5 var(--fonte-texto); }
+main { max-width: 980px; margin: 0 auto; padding-block: 40px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font: 700 clamp(2.4rem, 7vw, 3.6rem)/1 var(--fonte-titulo); margin: 0; }
+.sub { color: var(--suave); margin: 8px 0 0; font-size: 1.1rem; }
+.portas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.porta { display: grid; gap: 8px; align-content: start; text-decoration: none; color: var(--tinta); background: var(--painel); border: 1px solid var(--linha); border-radius: 18px; padding: 22px; border-top: 6px solid var(--cor); transition: transform .15s ease; }
+.porta:hover { transform: translateY(-3px); }
+.porta:focus-visible { outline: 3px solid var(--azul); outline-offset: 3px; }
+.porta .icone { font-size: 2.6rem; line-height: 1; }
+.porta h2 { font: 600 1.45rem var(--fonte-titulo); margin: 0; }
+.porta p { margin: 0; color: var(--suave); }
+.porta span.ir { font: 600 1rem var(--fonte-titulo); color: var(--azul); margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .porta { transition: none; } .porta:hover { transform: none; } }
+</style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Aptios</h1>
+        <p class="sub">Robótica, programação e física para quem tem de 8 a 12 anos.</p>
+    </header>
+    <nav class="portas" aria-label="Partes da Aptios">
+        <a class="porta" href="/ia" style="--cor: var(--azul)">
+            <span class="icone">🤖</span><h2>IA da Aptios</h2>
+            <p>Tire dúvidas de Scratch, LEGO SPIKE, EV3, Arduino e da física dos carros.</p>
+            <span class="ir">Conversar →</span>
+        </a>
+        <a class="porta" href="/oficina" style="--cor: var(--amarelo)">
+            <span class="icone">🧱</span><h2>Oficina</h2>
+            <p>Monte robôs em 3D, resolva desafios para ganhar tokens e lute na Arena.</p>
+            <span class="ir">Montar →</span>
+        </a>
+        <a class="porta" href="/pista" style="--cor: var(--verde)">
+            <span class="icone">🏎</span><h2>Pista</h2>
+            <p>Dirija 7 carros elétricos, faça rachas, explore a cidade e voe com o Roadster.</p>
+            <span class="ir">Acelerar →</span>
+        </a>
+    </nav>
+</main>
+</body>
+</html>

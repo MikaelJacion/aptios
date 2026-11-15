@@ -81,8 +81,10 @@ class Explorador:
     desafios_feitos: set[str] = field(default_factory=set)
     robo: list[PecaColocada] = field(default_factory=list)
     vitorias: set[str] = field(default_factory=set)  # rivais que já venceu
+    robos_salvos: dict[str, list[PecaColocada]] = field(default_factory=dict)  # a "coleção" de robôs
 
     MAX_PECAS_NO_ROBO = 300
+    MAX_ROBOS_SALVOS = 12
 
     def receber_presentes(self, catalogo: Catalogo) -> None:
         self.pecas |= {p.id for p in catalogo.pecas.values() if p.preco == 0}
@@ -126,6 +128,32 @@ class Explorador:
             raise RegraDaOficina(f"você ainda não tem: {', '.join(sorted(faltando))}")
         validar_encaixe(robo, catalogo)
         self.robo = list(robo)
+
+    # ── coleção de robôs: guardar o que está na bancada com um nome ──
+    @staticmethod
+    def _nome_valido(nome: str) -> str:
+        nome = " ".join(str(nome).split())          # tira espaços sobrando e quebras de linha
+        if not 1 <= len(nome) <= 30:
+            raise RegraDaOficina("o nome do robô precisa ter de 1 a 30 letras")
+        return nome
+
+    def guardar_robo(self, nome: str) -> None:
+        nome = self._nome_valido(nome)
+        if not self.robo:
+            raise RegraDaOficina("a bancada está vazia: monte um robô antes de guardar")
+        if nome not in self.robos_salvos and len(self.robos_salvos) >= self.MAX_ROBOS_SALVOS:
+            raise RegraDaOficina(f"você já tem {self.MAX_ROBOS_SALVOS} robôs guardados. Apague um para guardar outro")
+        self.robos_salvos[nome] = list(self.robo)   # nome repetido = atualiza o robô
+
+    def carregar_robo(self, nome: str, catalogo: Catalogo) -> None:
+        nome = self._nome_valido(nome)
+        if nome not in self.robos_salvos:
+            raise RegraDaOficina("não achei um robô com esse nome")
+        self.montar(self.robos_salvos[nome], catalogo)  # passa pelas mesmas regras de sempre
+
+    def apagar_robo(self, nome: str) -> None:
+        if self.robos_salvos.pop(self._nome_valido(nome), None) is None:
+            raise RegraDaOficina("não achei um robô com esse nome")
 
 
 @dataclass(frozen=True)

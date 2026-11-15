@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aptios Tutor</title>
+<title>IA da Aptios</title>
 <style>
 :root {
     --bg: #f4f7fb; --card: #ffffff; --texto: #1d2433; --suave: #5b6578;
@@ -26,7 +26,9 @@ body { margin: 0; background: var(--bg); color: var(--texto); font: 17px/1.5 sys
 header { padding: 18px 0 10px; text-align: center; }
 h1 { margin: 0; font-size: 1.6rem; }
 .sub { margin: 2px 0 0; color: var(--suave); font-size: .95rem; }
-.kits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.nav { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.nav a { color: var(--primaria); font-weight: 700; text-decoration: none; font-size: .95rem; }
+.kits { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 12px 0; }
 .kit { border: 2px solid var(--borda); background: var(--card); color: var(--texto); border-radius: 14px; padding: 10px 4px; font: inherit; font-size: .85rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .kit span { font-size: 1.6rem; }
 .kit[aria-pressed="true"] { border-color: var(--primaria); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primaria) 25%, transparent); font-weight: 700; }
@@ -49,8 +51,9 @@ button:disabled { opacity: .5; cursor: default; }
 <body>
 <div class="app">
     <header>
-        <h1>🤖 Aptios Tutor</h1>
-        <p class="sub">Seu ajudante de robótica e programação · <a href="/oficina" style="color:var(--primaria);font-weight:700">🧱 Ir para a Oficina</a> · <a href="/pista" style="color:var(--primaria);font-weight:700">🏎 Pista</a></p>
+        <h1>🤖 IA da Aptios</h1>
+        <p class="sub">Sua ajudante de robótica, programação e física</p>
+        <nav class="nav"><a href="/">🏠 Início</a><a href="/oficina">🧱 Oficina</a><a href="/pista">🏎 Pista</a></nav>
     </header>
 
     <div class="kits" role="group" aria-label="Escolha seu kit">
@@ -58,6 +61,7 @@ button:disabled { opacity: .5; cursor: default; }
         <button class="kit" data-kit="lego_spike" aria-pressed="false"><span>🟨</span>LEGO SPIKE</button>
         <button class="kit" data-kit="lego_ev3" aria-pressed="false"><span>🧱</span>LEGO EV3</button>
         <button class="kit" data-kit="arduino" aria-pressed="false"><span>🔌</span>Arduino</button>
+        <button class="kit" data-kit="pista" aria-pressed="false"><span>🏎</span>Carros e física</button>
     </div>
 
     <main id="chat" aria-live="polite"></main>
@@ -66,7 +70,7 @@ button:disabled { opacity: .5; cursor: default; }
         <textarea id="pergunta" rows="1" maxlength="1000" placeholder="Escreva sua pergunta..." aria-label="Sua pergunta"></textarea>
         <button class="enviar" id="enviar" type="submit">Enviar</button>
     </form>
-    <p class="aviso">O RoboTutor é uma IA e pode errar. Teste sempre e peça ajuda a um adulto com eletricidade e ferramentas. As conversas não são guardadas.</p>
+    <p class="aviso">A IA da Aptios pode errar. Teste sempre e peça ajuda a um adulto com eletricidade e ferramentas. As conversas não são guardadas.</p>
 </div>
 
 <script>
@@ -75,12 +79,14 @@ const SUGESTOES = {
     lego_spike: ['Como fazer o robô andar para frente?', 'Como usar o sensor de cor?', 'Desafio: seguir uma linha preta'],
     lego_ev3:   ['Como ligar os motores?', 'Como o robô desvia de obstáculos?', 'O que faz o giroscópio?'],
     arduino:    ['Como piscar um LED?', 'O que é um resistor?', 'Como usar um sensor de distância?'],
+    pista:      ['Por que o carro derrapa na curva?', 'Por que carro elétrico acelera tão rápido?', 'Como um carro poderia voar?'],
 };
 const BOAS_VINDAS = {
     scratch: 'Oi! 🐱 Vamos programar no Scratch? Me conta o que você quer criar!',
     lego_spike: 'Oi! 🟨 Vamos montar e programar com o LEGO SPIKE? Qual é o seu robô?',
     lego_ev3: 'Oi! 🧱 Vamos dar vida ao seu LEGO EV3? O que você quer que ele faça?',
     arduino: 'Oi! 🔌 Vamos de Arduino? Dica: dá para testar tudo no Tinkercad antes de ligar os fios de verdade!',
+    pista: 'Oi! 🏎 Vamos falar de carros e física? Pergunte sobre forças, curvas, baterias ou sobre o Roadster que voa da Pista!',
 };
 
 let kit = 'scratch';
@@ -171,6 +177,10 @@ form.onsubmit = e => { e.preventDefault(); const p = campo.value; campo.value = 
 campo.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
 });
+// /ia?kit=pista já abre no kit certo (a Pista e a Oficina usam isso nos links)
+const pedido = new URLSearchParams(location.search).get('kit');
+const botaoPedido = [...document.querySelectorAll('.kit')].find(b => b.dataset.kit === pedido);
+if (botaoPedido) { document.querySelectorAll('.kit').forEach(x => x.setAttribute('aria-pressed', x === botaoPedido)); kit = pedido; }
 recomecar();
 </script>
 </body>

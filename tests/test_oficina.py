@@ -207,3 +207,36 @@ def test_pecas_novas_destravam_golpes_novos():
     a = calcular_atributos(robo, CATALOGO)
     assert {"giro", "rasante", "choque"} <= set(a.golpes)
     assert a.precisao >= 55 + 12 and a.defesa >= 4
+
+
+
+def test_guardar_carregar_e_apagar_robos():
+    from aptios.oficina.dominio import Explorador
+    e = Explorador("x"); e.receber_presentes(CATALOGO)
+    carrinho = [PecaColocada("placa_4x6", -2, 0, -3, 0), PecaColocada("controlador", -1, 1, -2, 0)]
+    with pytest.raises(RegraDaOficina):
+        e.guardar_robo("vazio")                          # bancada vazia não guarda
+    e.montar(carrinho, CATALOGO); e.guardar_robo("  Meu   Carrinho ")
+    assert list(e.robos_salvos) == ["Meu Carrinho"]      # espaços extras somem
+    e.montar([], CATALOGO); e.carregar_robo("Meu Carrinho", CATALOGO)
+    assert e.robo == carrinho
+    for i in range(Explorador.MAX_ROBOS_SALVOS - 1):
+        e.guardar_robo(f"robo {i}")
+    with pytest.raises(RegraDaOficina):
+        e.guardar_robo("um a mais")                      # coleção cheia
+    e.guardar_robo("Meu Carrinho")                       # mas atualizar um que já existe pode
+    e.apagar_robo("Meu Carrinho")
+    assert "Meu Carrinho" not in e.robos_salvos
+    with pytest.raises(RegraDaOficina):
+        e.guardar_robo("x" * 31)
+
+
+def test_robos_salvos_sobrevivem_no_banco(tmp_path):
+    from aptios.oficina.infra import ExploradoresSQLite
+    repo = ExploradoresSQLite(str(tmp_path / "t.db"))
+    of = oficina(repo)
+    cod = of.novo_explorador()["codigo"]
+    of.salvar_robo(cod, [{"peca_id": "placa_4x6", "x": 0, "y": 0, "z": 0, "giro": 0}])
+    estado = of.guardar_robo(cod, "Tanque")
+    assert estado["robos_salvos"] == [{"nome": "Tanque", "pecas": 1}]
+    assert repo.buscar(cod).robos_salvos["Tanque"][0].peca_id == "placa_4x6"
