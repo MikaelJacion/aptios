@@ -177,7 +177,11 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
 
 def dados_da_pista() -> dict:
     from dataclasses import asdict
-    return {"carro": asdict(ROADSTER), "ficha": ficha(ROADSTER), "ficha_foguete": ficha(ROADSTER, foguete=True)}
+    dados = {"carro": asdict(ROADSTER), "ficha": ficha(ROADSTER), "ficha_foguete": ficha(ROADSTER, foguete=True)}
+    # Modelo 3D feito no Meshy (opcional). Sem ele, a página desenha um carro com formas simples.
+    if (PASTA_ESTATICA / "modelos" / "roadster.glb").exists():
+        dados["modelo"] = "/static/modelos/roadster.glb"
+    return dados
 
 
 def _app_padrao() -> FastAPI:

@@ -50,3 +50,11 @@ def test_rota_da_pista():
     assert dados["carro"]["nome"] == "Roadster Elétrico"
     assert dados["ficha_foguete"]["zero_a_cem_s"] < dados["ficha"]["zero_a_cem_s"]
     assert "Pista Aptios" in c.get("/pista").text
+
+
+def test_curva_mais_aberta_permite_mais_velocidade():
+    from aptios.pista.fisica import velocidade_max_na_curva
+    v50 = velocidade_max_na_curva(ROADSTER, 50)
+    assert abs(velocidade_max_na_curva(ROADSTER, 200) / v50 - 2) < 1e-9   # raio 4× maior = 2× mais rápido
+    gelo = replace(ROADSTER, aderencia=0.3)
+    assert velocidade_max_na_curva(gelo, 50) < v50 / 2                     # no gelo, devagar!

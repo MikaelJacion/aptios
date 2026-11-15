@@ -122,3 +122,13 @@ ROADSTER = CarroEletrico(
     foguete_n=20000, foguete_s=8,
 )
 
+
+
+def velocidade_max_na_curva(carro: CarroEletrico, raio_m: float) -> float:
+    """A maior velocidade (m/s) para fazer uma curva sem derrapar.
+
+    Na curva, o pneu precisa puxar o carro para dentro. A força necessária é
+    m·v²/r, e o máximo que o pneu aguenta é μ·m·g. Igualando:  v = √(μ·g·r)
+    (repare que a massa some da conta!)
+    """
+    return (carro.aderencia * G * raio_m) ** 0.5

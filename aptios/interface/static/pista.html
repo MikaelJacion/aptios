@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&display=swap">
 <style>
-/* Layout: pista 3D grande com o painel de instrumentos por cima; painel de física à direita (empilha no celular). */
+/* Layout: cena 3D grande com o painel de instrumentos por cima; painel de física à direita (empilha no celular). */
 :root {
     --fundo: #e9eef3; --painel: #ffffff; --tinta: #1b2430; --suave: #5d6b7c; --linha: #d3dbe4;
     --amarelo: #ffcf33; --amarelo-tinta: #2a2100; --azul: #2a5bd7; --azul-tinta: #ffffff;
@@ -40,13 +40,13 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 .espaco { flex: 1; }
 .link { color: var(--azul); font-weight: 800; text-decoration: none; }
 .demo { font: 600 .75rem var(--fonte-titulo); background: var(--amarelo); color: var(--amarelo-tinta); border-radius: 6px; padding: 2px 8px; }
+.modos { display: inline-flex; border: 1px solid var(--linha); border-radius: 999px; padding: 3px; background: var(--fundo); }
+.modo { font: 600 .9rem var(--fonte-titulo); border: 0; background: transparent; color: var(--tinta); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.modo[aria-pressed="true"] { background: var(--tinta); color: var(--painel); }
 .pista { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 360px; }
 .cena { position: relative; min-height: 360px; overflow: hidden; }
-.cena canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.hud {
-    position: absolute; left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none;
-    max-width: calc(100% - 24px);
-}
+.cena canvas.tela3d { display: block; width: 100%; height: 100%; touch-action: none; }
+.hud { position: absolute; left: 12px; top: 12px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; max-width: calc(100% - 190px); }
 .mostrador { background: var(--vidro); color: var(--vidro-tinta); border-radius: 12px; padding: 8px 12px; min-width: 84px; font-variant-numeric: tabular-nums; }
 .mostrador b { display: block; font: 700 1.5rem/1.1 var(--fonte-titulo); }
 .mostrador.grande b { font-size: 2.4rem; }
@@ -54,9 +54,10 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 .tanque { height: 6px; border-radius: 3px; background: rgba(255,255,255,.2); margin-top: 5px; overflow: hidden; }
 .tanque i { display: block; height: 100%; background: var(--verde); }
 .tanque.foguete i { background: var(--laranja); }
+.minimapa { position: absolute; right: 12px; top: 12px; width: 160px; height: 160px; border-radius: 12px; background: var(--vidro); pointer-events: none; }
 .recado {
-    position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none;
-    font: 700 clamp(1.4rem, 4vw, 2.4rem) var(--fonte-titulo); color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.6); text-align: center;
+    position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none; width: min(90%, 640px);
+    font: 700 clamp(1.3rem, 4vw, 2.3rem) var(--fonte-titulo); color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.6); text-align: center;
 }
 .comandos { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
 .botao {
@@ -66,8 +67,9 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 .botao[aria-pressed="true"] { background: var(--laranja); color: #fff; }
 .botao.acelerar { background: var(--verde); color: #fff; padding: 16px 26px; font-size: 1.15rem; }
 .botao.frear { background: var(--vermelho); color: #fff; padding: 16px 22px; font-size: 1.15rem; }
+.botao.virar { padding: 16px 22px; font-size: 1.15rem; }
 .botao:active, .botao.apertado { transform: translateY(1px); filter: brightness(1.12); }
-.botao:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+.botao:focus-visible, .modo:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
 .painel { background: var(--painel); border-left: 1px solid var(--linha); overflow-y: auto; padding: 14px 16px 24px; display: grid; gap: 18px; align-content: start; }
 .painel h2 { font: 600 1.05rem var(--fonte-titulo); margin: 0 0 8px; }
 .explica { margin: 0; color: var(--suave); font-size: .88rem; }
@@ -84,13 +86,18 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 .controle input { width: 100%; accent-color: var(--azul); }
 .secundario { font: 600 .88rem var(--fonte-titulo); border: 1px solid var(--linha); background: var(--fundo); color: var(--tinta); border-radius: 10px; padding: 7px 12px; cursor: pointer; }
 .nota { font-size: .78rem; color: var(--suave); margin: 0; }
+.contador { font: 700 1.6rem var(--fonte-titulo); font-variant-numeric: tabular-nums; }
+[hidden] { display: none !important; }
 @media (max-width: 860px) {
     .pista { grid-template-columns: 1fr; }
-    .cena { height: 62vh; }
+    .cena { height: 64vh; }
     .painel { border-left: 0; border-top: 1px solid var(--linha); }
-    .mostrador { min-width: 70px; padding: 6px 9px; }
-    .mostrador b { font-size: 1.15rem; }
-    .mostrador.grande b { font-size: 1.8rem; }
+    .hud { max-width: calc(100% - 130px); }
+    .minimapa { width: 110px; height: 110px; }
+    .mostrador { min-width: 66px; padding: 6px 9px; }
+    .mostrador b { font-size: 1.1rem; }
+    .mostrador.grande b { font-size: 1.7rem; }
+    .botao.acelerar, .botao.frear, .botao.virar { padding: 14px 16px; }
 }
 </style>
 <script type="importmap">
@@ -103,6 +110,10 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 <body>
 <header class="topo">
     <h1 class="marca">Aptios <small>Pista</small></h1>
+    <div class="modos" role="group" aria-label="Modo de jogo">
+        <button class="modo" id="modo-arrancada" aria-pressed="true">🏁 Arrancada</button>
+        <button class="modo" id="modo-mundo" aria-pressed="false">🌎 Mundo aberto</button>
+    </div>
     <span class="demo" id="selo-demo" hidden>modo demonstração</span>
     <span class="espaco"></span>
     <a class="link" id="link-oficina" href="/oficina">🧱 Oficina</a>
@@ -119,22 +130,36 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
             <div class="mostrador"><b id="m-bat">100%</b><span>bateria</span><div class="tanque"><i id="t-bat" style="width:100%"></i></div></div>
             <div class="mostrador" id="mostrador-foguete" hidden><b id="m-fog">8,0 s</b><span>ar do foguete</span><div class="tanque foguete"><i id="t-fog" style="width:100%"></i></div></div>
         </div>
-        <div class="recado" id="recado">Segure ▲ ou o botão verde para acelerar!</div>
+        <canvas class="minimapa" id="minimapa" width="320" height="320" hidden aria-label="Mapa"></canvas>
+        <div class="recado" id="recado"></div>
         <div class="comandos">
+            <button class="botao virar" id="b-esquerda" hidden aria-label="Virar à esquerda">◀</button>
             <button class="botao acelerar" id="b-acelerar">▲ Acelerar</button>
             <button class="botao frear" id="b-frear">▼ Frear</button>
-            <button class="botao" id="b-foguete" aria-pressed="false">🚀 Modo foguete (F)</button>
+            <button class="botao virar" id="b-direita" hidden aria-label="Virar à direita">▶</button>
+            <button class="botao" id="b-foguete" aria-pressed="false">🚀 Foguete (F)</button>
             <button class="botao" id="b-recomecar">↺ Recomeçar (R)</button>
         </div>
     </section>
 
     <aside class="painel">
+        <section id="sec-mundo" hidden>
+            <h2>🌎 Mundo aberto</h2>
+            <p class="explica">Dirija pela cidade com <b>▲ ▼ ◀ ▶</b> (ou W A S D). Pegue os <b>⚡ raios de energia</b>, pule nas <b>rampas</b> e não bata nos prédios! Segure ▼ parado para dar ré.</p>
+            <p style="margin:10px 0 0">⚡ Raios: <span class="contador" id="contador-raios">0 / 0</span></p>
+        </section>
+        <section id="sec-curva" hidden>
+            <h2>🛞 A curva e o pneu</h2>
+            <div class="forca"><span>Aderência usada</span><div class="barra"><i id="barra-aderencia" style="background:var(--verde)"></i></div><span id="valor-aderencia">0%</span></div>
+            <p class="explica" id="texto-curva">Na curva, o pneu precisa puxar o carro para dentro. Passou de 100%, ele escorrega: o carro DERRAPA!</p>
+            <p class="nota" style="margin-top:6px">A velocidade máxima numa curva é v = √(μ · g · r). Curva mais aberta (r maior) deixa passar mais rápido, e o pneu de gelo (μ pequeno), bem mais devagar.</p>
+        </section>
         <section>
             <h2>⚖️ Forças agora</h2>
             <div id="forcas"></div>
             <p class="explica" id="quem-ganha">Parado, nenhuma força está agindo.</p>
         </section>
-        <section>
+        <section id="sec-arrancada">
             <h2>⏱ Sua arrancada</h2>
             <table class="quadro">
                 <thead><tr><th></th><th>Você</th><th>Ficha</th></tr></thead>
@@ -144,7 +169,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
         </section>
         <section>
             <h2>🧪 Laboratório</h2>
-            <p class="explica" style="margin-bottom:10px">Mude o carro e veja o que acontece. Dica: dobre a massa e compare o 0 a 100!</p>
+            <p class="explica" style="margin-bottom:10px">Mude o carro e veja o que acontece. Dica: coloque pneu de gelo e tente fazer uma curva no mundo aberto!</p>
             <div id="laboratorio"></div>
             <button class="secundario" id="b-original">↩ Voltar ao carro original</button>
         </section>
@@ -158,6 +183,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 
 <script type="module">
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...filhos) => { const n = Object.assign(document.createElement(tag), props); n.append(...filhos); return n; };
@@ -194,6 +220,7 @@ function passo(c, e, dt, acelerador = 0, freio = 0, foguete = false) {
     };
 }
 const estadoInicial = (c) => ({ t: 0, x: 0, v: 0, energia: c.bateria_kwh, fogueteRestante: c.foguete_s, f: forcas(c, 0, 0, 0, false, 0), a: 0 });
+const velocidadeMaxNaCurva = (c, raio) => Math.sqrt(c.aderencia * G * raio);   // v = √(μ·g·r)
 
 function fichaJS(c, foguete = false) {   // igual à ficha() do Python
     let e = estadoInicial(c), zeroACem = null, t400 = null, v400 = null;
@@ -222,31 +249,18 @@ const caixa = $('cena');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
+renderer.domElement.className = 'tela3d';
 caixa.prepend(renderer.domElement);
 const cena = new THREE.Scene();
 cena.background = new THREE.Color(cor('--ceu'));
 cena.fog = new THREE.Fog(cena.background, 60, 260);
-const camera = new THREE.PerspectiveCamera(55, 1, .1, 600);
+const camera = new THREE.PerspectiveCamera(55, 1, .1, 900);
 cena.add(new THREE.HemisphereLight(0xffffff, 0x445533, 1.1));
 const sol = new THREE.DirectionalLight(0xffffff, 1.6);
-sol.position.set(-20, 40, 20); sol.castShadow = true;
-sol.shadow.camera.left = sol.shadow.camera.bottom = -20; sol.shadow.camera.right = sol.shadow.camera.top = 20;
+sol.castShadow = true;
+sol.shadow.camera.left = sol.shadow.camera.bottom = -25; sol.shadow.camera.right = sol.shadow.camera.top = 25;
 cena.add(sol, sol.target);
-
 const mat = (c, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: .6, ...extra });
-// O chão "anda junto" com o carro, e as faixas e postes são reaproveitados (a pista parece infinita).
-const grama = new THREE.Mesh(new THREE.PlaneGeometry(1200, 600), mat(cor('--grama'), { roughness: 1 }));
-grama.rotation.x = -Math.PI / 2; grama.position.y = -.02; grama.receiveShadow = true;
-const asfalto = new THREE.Mesh(new THREE.PlaneGeometry(1200, 12), mat(cor('--asfalto'), { roughness: .95 }));
-asfalto.rotation.x = -Math.PI / 2; asfalto.receiveShadow = true;
-cena.add(grama, asfalto);
-
-const FAIXA = 12, N_FAIXAS = 50;
-const faixas = new THREE.InstancedMesh(new THREE.BoxGeometry(4, .02, .25), mat(0xf4f4f4), N_FAIXAS);
-const bordas = new THREE.InstancedMesh(new THREE.BoxGeometry(FAIXA / 2, .03, .4), mat(0xd64545), N_FAIXAS * 2);
-const POSTE = 100, N_POSTES = 6;
-const postes = [];
-cena.add(faixas, bordas);
 
 function placa(texto, fundo = '#ffffff', tinta = '#1b2430') {
     const tela = Object.assign(document.createElement('canvas'), { width: 256, height: 128 }), g = tela.getContext('2d');
@@ -255,46 +269,145 @@ function placa(texto, fundo = '#ffffff', tinta = '#1b2430') {
     g.fillText(texto, 128, 68);
     return new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(tela) }));
 }
-for (let i = 0; i < N_POSTES; i++) {
+
+// ───────── modo ARRANCADA: uma reta infinita ─────────
+// O chão "anda junto" com o carro, e as faixas e postes são reaproveitados.
+const arrancada = new THREE.Group(); cena.add(arrancada);
+const grama = new THREE.Mesh(new THREE.PlaneGeometry(1200, 600), mat(cor('--grama'), { roughness: 1 }));
+grama.rotation.x = -Math.PI / 2; grama.position.y = -.02; grama.receiveShadow = true;
+const asfalto = new THREE.Mesh(new THREE.PlaneGeometry(1200, 12), mat(cor('--asfalto'), { roughness: .95 }));
+asfalto.rotation.x = -Math.PI / 2; asfalto.receiveShadow = true;
+const FAIXA = 12, N_FAIXAS = 50;
+const faixas = new THREE.InstancedMesh(new THREE.BoxGeometry(4, .02, .25), mat(0xf4f4f4), N_FAIXAS);
+const bordas = new THREE.InstancedMesh(new THREE.BoxGeometry(FAIXA / 2, .03, .4), mat(0xd64545), N_FAIXAS * 2);
+arrancada.add(grama, asfalto, faixas, bordas);
+const POSTE = 100, postes = [];
+for (let i = 0; i < 6; i++) {
     const g = new THREE.Group();
     const haste = new THREE.Mesh(new THREE.BoxGeometry(.15, 2.2, .15), mat(0x8a8f98)); haste.position.y = 1.1;
-    g.add(haste); g.position.z = -8; g.userData.metros = null;
-    cena.add(g); postes.push(g);
+    g.add(haste); g.position.z = -8; arrancada.add(g); postes.push(g);
 }
 function atualizarPoste(g, metros) {
     if (g.userData.metros === metros) return;
     if (g.userData.placa) g.remove(g.userData.placa);
-    const p = placa(`${metros} m`); p.position.set(0, 2.6, 0); p.rotation.y = 0;
+    const p = placa(`${metros} m`); p.position.set(0, 2.6, 0);
     g.add(p); g.userData.placa = p; g.userData.metros = metros; g.position.x = metros;
 }
-
 function portico(x, texto, fundo) {
     const g = new THREE.Group();
     for (const z of [-6.5, 6.5]) { const c = new THREE.Mesh(new THREE.BoxGeometry(.4, 5, .4), mat(0x2b2f36)); c.position.set(0, 2.5, z); g.add(c); }
     const faixa = placa(texto, fundo, '#ffffff'); faixa.scale.set(5.6, 1.2, 1); faixa.position.set(0, 5.2, 0); faixa.rotation.y = -Math.PI / 2;
     const tras = faixa.clone(); tras.rotation.y = Math.PI / 2; g.add(faixa, tras);
-    const linha = new THREE.Mesh(new THREE.BoxGeometry(.6, .03, 12), mat(0xffffff)); g.add(linha);
-    g.position.x = x; cena.add(g);
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(.6, .03, 12), mat(0xffffff)));
+    g.position.x = x; arrancada.add(g);
 }
-portico(0, 'LARGADA', '#2a5bd7');
-portico(400, '400 m', '#1f9d55');
-portico(1000, '1 km', '#7a4fd6');
+portico(0, 'LARGADA', '#2a5bd7'); portico(400, '400 m', '#1f9d55'); portico(1000, '1 km', '#7a4fd6');
 
-// O carro: formas simples (sem logotipo de marca nenhuma).
-const veiculo = new THREE.Group();
+// ───────── modo MUNDO ABERTO: uma cidade com ruas, prédios, rampas e raios ─────────
+const mundo = new THREE.Group(); mundo.visible = false; cena.add(mundo);
+const MUNDO = 800, QUADRA = 200, RUA = 18;
+const predios = [], raios = [], rampas = [];
+let mundoPronto = false, mapaFundo = null;
+const sorteador = (s) => () => (s = (s * 16807) % 2147483647) / 2147483647;   // "sorteio" que sai sempre igual
+
+function construirMundo() {
+    if (mundoPronto) return;
+    mundoPronto = true;
+    const sorte = sorteador(2026), lado = 2 * MUNDO + 200;
+    const chao = new THREE.Mesh(new THREE.PlaneGeometry(lado, lado), mat(cor('--grama'), { roughness: 1 }));
+    chao.rotation.x = -Math.PI / 2; chao.position.y = -.02; chao.receiveShadow = true; mundo.add(chao);
+    // ruas em grade, com faixa branca no meio
+    const ruaMat = mat(cor('--asfalto'), { roughness: .95 }), linhas = [];
+    for (let k = -MUNDO; k <= MUNDO; k += QUADRA) {
+        const a = new THREE.Mesh(new THREE.PlaneGeometry(2 * MUNDO + RUA, RUA), ruaMat); a.rotation.x = -Math.PI / 2; a.position.set(0, 0, k);
+        const b = new THREE.Mesh(new THREE.PlaneGeometry(RUA, 2 * MUNDO + RUA), ruaMat); b.rotation.x = -Math.PI / 2; b.position.set(k, .004, 0);
+        a.receiveShadow = b.receiveShadow = true; mundo.add(a, b);
+        for (let t = -MUNDO; t < MUNDO; t += 12) { linhas.push([t + 6, k, 0], [k, t + 6, Math.PI / 2]); }
+    }
+    const tracos = new THREE.InstancedMesh(new THREE.BoxGeometry(4, .02, .25), mat(0xf4f4f4), linhas.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    linhas.forEach(([x, z, r], i) => tracos.setMatrixAt(i, m4.compose(new THREE.Vector3(x, .012, z), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r), new THREE.Vector3(1, 1, 1))));
+    mundo.add(tracos);
+    // quadras: prédios ou praças com árvores
+    const cubo = new THREE.BoxGeometry(1, 1, 1), cores = ['#c9ced6', '#e6d3b3', '#9fb4c7', '#d9a68c', '#b7c9a8', '#a9a3c9', '#e8e2d0'];
+    const materiais = cores.map(c => mat(c, { roughness: .8 })), arvores = [];
+    for (let i = 0; i < 2 * MUNDO / QUADRA; i++) for (let j = 0; j < 2 * MUNDO / QUADRA; j++) {
+        const x0 = -MUNDO + i * QUADRA + RUA / 2 + 8, z0 = -MUNDO + j * QUADRA + RUA / 2 + 8, util = QUADRA - RUA - 16;
+        if (sorte() < .22) {   // praça
+            for (let n = 0; n < 30; n++) arvores.push([x0 + sorte() * util, z0 + sorte() * util, .8 + sorte() * .6]);
+            continue;
+        }
+        const lote = util / 3;
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+            if (sorte() < .3) { if (sorte() < .5) arvores.push([x0 + (a + .5) * lote, z0 + (b + .5) * lote, 1]); continue; }
+            const w = lote * (.55 + sorte() * .35), d = lote * (.55 + sorte() * .35), h = 8 + Math.pow(sorte(), 2) * 70;
+            const cx = x0 + (a + .5) * lote, cz = z0 + (b + .5) * lote;
+            const p = new THREE.Mesh(cubo, materiais[Math.floor(sorte() * materiais.length)]);
+            p.scale.set(w, h, d); p.position.set(cx, h / 2, cz); p.castShadow = p.receiveShadow = true; mundo.add(p);
+            predios.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
+        }
+    }
+    const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(.35, .45, 3, 8), mat('#7a5a3a'), arvores.length);
+    const copa = new THREE.InstancedMesh(new THREE.SphereGeometry(2.6, 12, 10), mat('#3f8f4a', { roughness: .9 }), arvores.length);
+    arvores.forEach(([x, z, s], i) => {
+        tronco.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 1.5 * s, z), q.identity(), new THREE.Vector3(s, s, s)));
+        copa.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 4.2 * s, z), q.identity(), new THREE.Vector3(s, s, s)));
+        predios.push({ x0: x - .5, x1: x + .5, z0: z - .5, z1: z + .5 });   // bater numa árvore também para o carro
+    });
+    tronco.castShadow = copa.castShadow = true; mundo.add(tronco, copa);
+    // rampas (só sobem no sentido +x): um triângulo "esticado" para os lados
+    const forma = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(16, 0), new THREE.Vector2(16, 3.2)]);
+    const rampaGeo = new THREE.ExtrudeGeometry(forma, { depth: 10, bevelEnabled: false }).translate(0, 0, -5);
+    const rampaMat = mat('#f2b134', { roughness: .7 });
+    for (const [x, z] of [[-560, 0], [140, 0], [-260, 400], [420, -400], [-60, -600], [300, 600]]) {
+        const r = new THREE.Mesh(rampaGeo, rampaMat); r.position.set(x, 0, z); r.castShadow = r.receiveShadow = true; mundo.add(r);
+        rampas.push({ x, z, L: 16, H: 3.2, W: 10 });
+    }
+    // raios de energia nas esquinas e no meio das ruas
+    const raioGeo = new THREE.OctahedronGeometry(1.1), raioMat = new THREE.MeshStandardMaterial({ color: 0xffd23f, emissive: 0xffb000, emissiveIntensity: .8 });
+    for (let n = 0; n < 24; n++) {
+        const k = -MUNDO + QUADRA * Math.floor(sorte() * 9), t = -MUNDO + 40 + sorte() * (2 * MUNDO - 80);
+        const [x, z] = sorte() < .5 ? [t, k] : [k, t];
+        const o = new THREE.Mesh(raioGeo, raioMat); o.position.set(x, 1.6, z); mundo.add(o);
+        raios.push({ obj: o, x, z, pego: false });
+    }
+    // borda do mundo
+    const muroMat = mat('#8a8f98');
+    for (const [x, z, w, d] of [[0, -MUNDO - 40, lado, 2], [0, MUNDO + 40, lado, 2], [-MUNDO - 40, 0, 2, lado], [MUNDO + 40, 0, 2, lado]]) {
+        const m = new THREE.Mesh(cubo, muroMat); m.scale.set(w, 3, d); m.position.set(x, 1.5, z); mundo.add(m);
+        predios.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 });
+    }
+    // fundo do minimapa (desenhado uma vez só)
+    mapaFundo = Object.assign(document.createElement('canvas'), { width: 320, height: 320 });
+    const g = mapaFundo.getContext('2d'), s = 320 / lado, px = (v) => (v + lado / 2) * s;
+    g.fillStyle = '#4e7a45'; g.fillRect(0, 0, 320, 320);
+    g.fillStyle = '#2a2e35';
+    for (let k = -MUNDO; k <= MUNDO; k += QUADRA) { g.fillRect(px(-MUNDO), px(k) - 3, 2 * MUNDO * s, 6); g.fillRect(px(k) - 3, px(-MUNDO), 6, 2 * MUNDO * s); }
+    g.fillStyle = '#c9ced6';
+    for (const p of predios) if (p.x1 - p.x0 > 2) g.fillRect(px(p.x0), px(p.z0), (p.x1 - p.x0) * s, (p.z1 - p.z0) * s);
+    g.fillStyle = '#f2b134';
+    for (const r of rampas) g.fillRect(px(r.x), px(r.z - r.W / 2), r.L * s + 1, r.W * s);
+}
+
+function alturaDoChao(x, z) {
+    for (const r of rampas) if (x >= r.x && x <= r.x + r.L && Math.abs(z - r.z) <= r.W / 2) return (x - r.x) / r.L * r.H;
+    return 0;
+}
+const bateu = (x, z, raio = 1.3) => predios.some(p => x > p.x0 - raio && x < p.x1 + raio && z > p.z0 - raio && z < p.z1 + raio);
+
+// ───────── o carro: formas simples, ou o modelo do Meshy, se existir ─────────
+const veiculo = new THREE.Group(), formasSimples = [];
 const pintura = mat(0xc8102e, { metalness: .4, roughness: .3 });
-const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; veiculo.add(o); return o; };
-add(new THREE.BoxGeometry(4.3, .5, 1.95), pintura, 0, .55, 0);                                  // corpo baixo
-const bico = add(new THREE.BoxGeometry(1.2, .32, 1.85), pintura, 2.45, .46, 0); bico.rotation.z = -.18; // frente em cunha
-add(new THREE.BoxGeometry(1.7, .42, 1.55), mat(0x1c2733, { metalness: .2, roughness: .15 }), -.25, 1.0, 0); // vidros
-add(new THREE.BoxGeometry(.3, .12, 2.0), pintura, -2.1, 1.0, 0);                                // aerofólio
+const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; veiculo.add(o); formasSimples.push(o); return o; };
+add(new THREE.BoxGeometry(4.3, .5, 1.95), pintura, 0, .55, 0);
+const bico = add(new THREE.BoxGeometry(1.2, .32, 1.85), pintura, 2.45, .46, 0); bico.rotation.z = -.18;
+add(new THREE.BoxGeometry(1.7, .42, 1.55), mat(0x1c2733, { metalness: .2, roughness: .15 }), -.25, 1.0, 0);
+add(new THREE.BoxGeometry(.3, .12, 2.0), pintura, -2.1, 1.0, 0);
 const luzFreio = add(new THREE.BoxGeometry(.05, .12, 1.6), mat(0x550000, { emissive: 0x000000 }), -2.16, .7, 0);
 const rodas = [];
 for (const [x, z] of [[1.45, .95], [1.45, -.95], [-1.45, .95], [-1.45, -.95]]) {
     const r = add(new THREE.CylinderGeometry(.38, .38, .3, 20), mat(0x15171a, { roughness: .9 }), x, .38, z);
     r.rotation.x = Math.PI / 2; rodas.push(r);
-    const aro = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .32, 12), mat(0xbfc5cc, { metalness: .8, roughness: .3 }));
-    r.add(aro);
+    r.add(new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .32, 12), mat(0xbfc5cc, { metalness: .8, roughness: .3 })));
 }
 const chamas = [];
 for (const z of [-.45, .45]) {
@@ -303,16 +416,39 @@ for (const z of [-.45, .45]) {
 }
 cena.add(veiculo);
 
-// ═════════════════ CORRIDA ═════════════════
-const comando = { acelerar: false, frear: false, foguete: false };
-let e = estadoInicial(carro), correndo = false, marcas = {}, velMax = 0;
+if (dados.modelo) new GLTFLoader().load(dados.modelo, (gltf) => {
+    // Ajusta o modelo: comprimento no eixo x, uns 4,6 m de comprimento e as rodas no chão.
+    const m = gltf.scene, tam = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
+    if (tam.z > tam.x) m.rotation.y = Math.PI / 2;
+    m.rotation.y += (dados.modelo_giro || 0) * Math.PI / 180;
+    m.updateMatrixWorld(true);
+    m.scale.setScalar(4.6 / new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3()).x);
+    m.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(m), centro = b.getCenter(new THREE.Vector3());
+    m.position.set(-centro.x, -b.min.y, -centro.z);
+    m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    formasSimples.forEach(o => o.visible = false);
+    veiculo.add(m);
+}, undefined, () => {});   // se falhar, fica o carro de formas simples
+
+// ═════════════════ ESTADO DA CORRIDA ═════════════════
+const comando = { acelerar: false, frear: false, foguete: false, esquerda: false, direita: false };
+let modo = 'arrancada', e = estadoInicial(carro), correndo = false, marcas = {}, velMax = 0;
+// no mundo aberto: posição, direção (rumo), pulo e ré
+const pos = { x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity };
+let pegos = 0, recadoAte = 0;
 const recordes = (() => { try { return JSON.parse(ler('aptios_pista_recordes')) || {}; } catch { return {}; } })();
+
+function dizer(texto, segundos = 1.6) { $('recado').textContent = texto; recadoAte = segundos ? performance.now() + segundos * 1000 : Infinity; }
 
 function recomecar() {
     e = estadoInicial(carro); correndo = false; marcas = {}; velMax = 0;
-    $('recado').textContent = 'Segure ▲ ou o botão verde para acelerar!';
-    desenharResultados();
+    Object.assign(pos, { x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity });
+    if (modo === 'mundo') { pos.x = -MUNDO + QUADRA * 2; pos.z = 0; for (const r of raios) { r.pego = false; r.obj.visible = true; } pegos = 0; }
+    dizer(modo === 'mundo' ? 'Explore a cidade! ⚡ Pegue os raios de energia.' : 'Segure ▲ ou o botão verde para acelerar!', 0);
+    desenharResultados(); atualizarContador();
 }
+const atualizarContador = () => { $('contador-raios').textContent = `${pegos} / ${raios.length}`; };
 
 function marcar(chave, valor) {
     if (marcas[chave] !== undefined) return;
@@ -322,18 +458,71 @@ function marcar(chave, valor) {
     desenharResultados();
 }
 
-const DT = 1 / 240;
+const DT = 1 / 240, ENTRE_EIXOS = 2.9;
 function avancar(segundos) {
     for (let s = 0; s < segundos; s += DT) {
         const antes = e;
-        e = passo(carro, e, DT, comando.acelerar ? 1 : 0, comando.frear ? 1 : 0, comando.foguete);
-        if (!correndo && e.v > 0) { correndo = true; e.t = DT; $('recado').textContent = ''; }
+        const noAr = modo === 'mundo' && pos.voando;
+        e = passo(carro, e, DT, comando.acelerar && !noAr ? 1 : 0, comando.frear && !noAr ? 1 : 0, comando.foguete);
+        if (!correndo && (e.v > 0 || pos.re > 0)) { correndo = true; e.t = DT; if (recadoAte === Infinity) dizer(''); }
         if (!correndo) { e.t = 0; continue; }
-        if (antes.v < 100 / 3.6 && e.v >= 100 / 3.6) marcar('zero_a_cem_s', e.t);
-        if (antes.x < 400 && e.x >= 400) { marcar('quatrocentos_m_s', e.t); marcas.velocidade_400m_kmh = e.v * 3.6; }
-        velMax = Math.max(velMax, e.v * 3.6);
-        if (e.energia <= 0) { comando.acelerar = false; $('recado').textContent = '🔋 Acabou a bateria!'; }
+        if (e.energia <= 0) { comando.acelerar = false; dizer('🔋 Acabou a bateria!', 0); }
+        if (modo === 'arrancada') {
+            if (antes.v < 100 / 3.6 && e.v >= 100 / 3.6) marcar('zero_a_cem_s', e.t);
+            if (antes.x < 400 && e.x >= 400) { marcar('quatrocentos_m_s', e.t); marcas.velocidade_400m_kmh = e.v * 3.6; }
+            velMax = Math.max(velMax, e.v * 3.6);
+        } else andarNoMundo(e.x - antes.x, DT);
     }
+}
+
+function andarNoMundo(ds, dt) {
+    // ré: segurando ▼ com o carro parado, ele anda para trás devagar
+    pos.re = comando.frear && !comando.acelerar && e.v < .3 && !pos.voando ? Math.min(pos.re + 4 * dt, 5) : Math.max(pos.re - 8 * dt, 0);
+    ds -= pos.re * dt;
+    const v = e.v - pos.re;
+    // volante: vira aos poucos, e vira menos em alta velocidade (como num carro de verdade)
+    const alvo = (comando.esquerda ? 1 : 0) - (comando.direita ? 1 : 0);
+    pos.volante += Math.max(-4 * dt, Math.min(4 * dt, alvo - pos.volante));
+    const angulo = pos.volante * .6 / (1 + Math.abs(v) / 18);
+    let giro = 0;
+    pos.derrapando = false; pos.raioCurva = Infinity;
+    if (!pos.voando && Math.abs(angulo) > 1e-3) {
+        pos.raioCurva = ENTRE_EIXOS / Math.tan(Math.abs(angulo));
+        giro = v * Math.tan(angulo) / ENTRE_EIXOS;              // quanto o carro gira por segundo
+        const lateral = Math.abs(v * giro), limite = carro.aderencia * G;   // aceleração "para dentro" da curva
+        if (lateral > limite) {                                   // o pneu não aguenta: DERRAPA
+            giro = Math.sign(giro) * limite / Math.max(Math.abs(v), .1);
+            pos.derrapando = true;
+            e = { ...e, v: Math.max(0, e.v - 3 * dt) };           // derrapar gasta velocidade
+        }
+    }
+    const lat = Math.abs(v * giro);
+    pos.aderenciaUsada = Math.hypot(lat, pos.voando ? 0 : e.a) / (carro.aderencia * G);
+    pos.rumo += giro * dt;
+    const nx = pos.x + Math.cos(pos.rumo) * ds, nz = pos.z - Math.sin(pos.rumo) * ds;
+    // pulo: na rampa o carro sobe; quando a rampa acaba, ele voa e a gravidade puxa de volta
+    const chao = alturaDoChao(nx, nz);
+    if (!pos.voando && chao - pos.y > .8) return batida();      // bateu na parede de trás da rampa
+    if (bateu(nx, nz) && pos.y < 6) return batida();
+    pos.x = nx; pos.z = nz;
+    if (pos.voando) {
+        pos.vy -= G * dt; pos.y += pos.vy * dt;
+        if (pos.y <= chao) { pos.y = chao; pos.voando = false; if (pos.vy < -6) dizer(`💥 Pousou! Caiu a ${num(-pos.vy * 3.6)} km/h`); pos.vy = 0; }
+    } else if (chao < pos.y - .05 && ds > 0) {                   // a rampa acabou embaixo do carro: decolou!
+        pos.voando = true; pos.vy = e.v * Math.sin(Math.atan(3.2 / 16));
+        dizer(`🛫 Voou a ${num(e.v * 3.6)} km/h!`);
+    } else pos.y = chao;
+    // raios de energia
+    for (const r of raios) if (!r.pego && Math.hypot(r.x - pos.x, r.z - pos.z) < 3.2 && pos.y < 4) {
+        r.pego = true; r.obj.visible = false; pegos++;
+        e = { ...e, energia: Math.min(carro.bateria_kwh, e.energia + carro.bateria_kwh * .05) };
+        dizer(pegos === raios.length ? '🏆 Você pegou TODOS os raios!' : '⚡ +5% de bateria!'); atualizarContador();
+    }
+}
+function batida() {
+    const kmh = Math.abs(e.v - pos.re) * 3.6;
+    e = { ...e, v: 0 }; pos.re = 0;
+    if (kmh > 8) dizer(`💥 Bateu a ${num(kmh)} km/h! Segure ▼ para dar ré.`);
 }
 
 // ═════════════════ PAINEL ═════════════════
@@ -352,10 +541,21 @@ function desenharForcas() {
         linhasForca[k].valor.textContent = num(f[k]) + ' N';
     }
     const empurra = f.motor + f.foguete, segura = f.arrasto + f.rolamento + f.freio;
-    $('quem-ganha').textContent = e.v === 0 && empurra === 0 ? 'Parado: nenhuma força está agindo.'
+    $('quem-ganha').textContent = pos.re > 0 ? '↩ Dando ré devagarinho.'
+        : e.v === 0 && empurra === 0 ? 'Parado: nenhuma força está agindo.'
         : e.v * 3.6 >= carro.limite_kmh - .5 && !comando.frear ? `🚧 Limitador em ${num(carro.limite_kmh)} km/h: o motor só empurra o suficiente para vencer o ar.`
         : empurra > segura ? `Empurra (${num(empurra)} N) mais do que segura (${num(segura)} N): o carro ACELERA.`
         : `Segura (${num(segura)} N) mais do que empurra (${num(empurra)} N): o carro PERDE velocidade.`;
+    if (modo === 'mundo') {
+        const u = Math.min(pos.aderenciaUsada, 1.5);
+        $('barra-aderencia').style.width = Math.min(100, u * 100) + '%';
+        $('barra-aderencia').style.background = u > .98 ? 'var(--vermelho)' : u > .75 ? 'var(--laranja)' : 'var(--verde)';
+        $('valor-aderencia').textContent = num(Math.min(u, 1) * 100) + '%';
+        $('texto-curva').textContent = pos.voando ? '🛫 No ar, o pneu não toca o chão: não dá para virar nem frear!'
+            : pos.derrapando ? '😱 DERRAPANDO! O pneu não aguentou puxar o carro para dentro da curva. Tire o pé e vire menos.'
+            : pos.raioCurva < 1e4 ? `Curva com raio de ${num(pos.raioCurva)} m: o máximo sem derrapar é ${num(velocidadeMaxNaCurva(carro, pos.raioCurva) * 3.6)} km/h. Você está a ${num(e.v * 3.6)} km/h.`
+            : 'Na curva, o pneu precisa puxar o carro para dentro. Passou de 100%, ele escorrega: o carro DERRAPA!';
+    }
 }
 
 const LINHAS = [['zero_a_cem_s', '0 a 100 km/h', (v) => num(v, 2) + ' s'], ['quatrocentos_m_s', '400 metros', (v) => num(v, 2) + ' s'],
@@ -373,7 +573,7 @@ function desenharResultados() {
 
 // Laboratório: sliders que mudam a ficha do carro
 const LAB = [['massa_kg', 'Massa', 800, 4000, 50, (v) => num(v) + ' kg'], ['potencia_kw', 'Potência', 100, 1500, 10, (v) => num(v) + ' kW'],
-             ['aderencia', 'Aderência do pneu', .5, 1.7, .05, (v) => num(v, 2) + (v < .8 ? ' (gelo)' : v < 1.05 ? ' (pneu comum)' : ' (pneu de corrida)')],
+             ['aderencia', 'Aderência do pneu', .2, 1.7, .05, (v) => num(v, 2) + (v < .5 ? ' (gelo!)' : v < .8 ? ' (chuva)' : v < 1.05 ? ' (pneu comum)' : ' (pneu de corrida)')],
              ['arrasto_cda', 'Arrasto (formato)', .3, 1.4, .05, (v) => num(v, 2) + (v > .9 ? ' (caixote!)' : ' m²')]];
 const sliders = {};
 for (const [k, nome, min, max, step, fmt] of LAB) {
@@ -390,7 +590,8 @@ function mudouCarro() {
     clearTimeout(espera);
     espera = setTimeout(() => {   // recalcula a ficha só quando a criança para de mexer
         fichaAtual = ehOriginal() ? { normal: dados.ficha, foguete: dados.ficha_foguete } : { normal: fichaJS(carro), foguete: fichaJS(carro, true) };
-        recomecar(); desenharSobre();
+        if (modo === 'arrancada') recomecar();
+        desenharResultados(); desenharSobre();
     }, 150);
 }
 $('b-original').onclick = () => { carro = { ...ORIGINAL }; for (const k in sliders) { sliders[k].input.value = carro[k]; sliders[k].valor.textContent = sliders[k].fmt(carro[k]); } mudouCarro(); };
@@ -402,15 +603,32 @@ function desenharSobre() {
         + `Depois, quem limita é a POTÊNCIA do motor. Lá em cima, o ARRASTO do ar fica enorme: a ${num(f.velocidade_max_kmh)} km/h ele empurra para trás com ${num(forcas(carro, f.velocidade_max_kmh / 3.6, 0, 0, false, 0).arrasto)} N!`;
 }
 
+// ═════════════════ MODOS ═════════════════
+function trocarModo(novo) {
+    if (novo === modo) return;
+    modo = novo;
+    const noMundo = modo === 'mundo';
+    if (noMundo) construirMundo();
+    arrancada.visible = !noMundo; mundo.visible = noMundo;
+    cena.fog.near = noMundo ? 120 : 60; cena.fog.far = noMundo ? 650 : 260;
+    $('modo-arrancada').setAttribute('aria-pressed', !noMundo); $('modo-mundo').setAttribute('aria-pressed', noMundo);
+    for (const id of ['sec-mundo', 'sec-curva', 'b-esquerda', 'b-direita', 'minimapa']) $(id).hidden = !noMundo;
+    $('sec-arrancada').hidden = noMundo;
+    veiculo.rotation.set(0, 0, 0);
+    recomecar();
+}
+$('modo-arrancada').onclick = () => trocarModo('arrancada');
+$('modo-mundo').onclick = () => trocarModo('mundo');
+
 // ═════════════════ COMANDOS ═════════════════
 function segurar(botao, chave) {
     const soltar = () => { comando[chave] = false; botao.classList.remove('apertado'); };
     botao.addEventListener('pointerdown', (ev) => { ev.preventDefault(); botao.setPointerCapture(ev.pointerId); comando[chave] = true; botao.classList.add('apertado'); });
     botao.addEventListener('pointerup', soltar); botao.addEventListener('pointercancel', soltar); botao.addEventListener('lostpointercapture', soltar);
 }
-segurar($('b-acelerar'), 'acelerar'); segurar($('b-frear'), 'frear');
+segurar($('b-acelerar'), 'acelerar'); segurar($('b-frear'), 'frear'); segurar($('b-esquerda'), 'esquerda'); segurar($('b-direita'), 'direita');
 function alternarFoguete() {
-    if (correndo) { $('recado').textContent = '🚀 Ligue o foguete antes da largada!'; setTimeout(() => { if (correndo) $('recado').textContent = ''; }, 1500); return; }
+    if (modo === 'arrancada' && correndo) { dizer('🚀 Na arrancada, ligue o foguete antes da largada!'); return; }
     comando.foguete = !comando.foguete;
     $('b-foguete').setAttribute('aria-pressed', comando.foguete);
     $('mostrador-foguete').hidden = !comando.foguete;
@@ -418,7 +636,7 @@ function alternarFoguete() {
 }
 $('b-foguete').onclick = alternarFoguete;
 $('b-recomecar').onclick = recomecar;
-const TECLAS = { ArrowUp: 'acelerar', KeyW: 'acelerar', ArrowDown: 'frear', KeyS: 'frear', Space: 'frear' };
+const TECLAS = { ArrowUp: 'acelerar', KeyW: 'acelerar', ArrowDown: 'frear', KeyS: 'frear', Space: 'frear', ArrowLeft: 'esquerda', KeyA: 'esquerda', ArrowRight: 'direita', KeyD: 'direita' };
 addEventListener('keydown', (ev) => {
     if (ev.target.tagName === 'INPUT') return;
     if (TECLAS[ev.code]) { comando[TECLAS[ev.code]] = true; ev.preventDefault(); }
@@ -426,42 +644,72 @@ addEventListener('keydown', (ev) => {
     else if (ev.code === 'KeyR' && !ev.repeat) recomecar();
 });
 addEventListener('keyup', (ev) => { if (TECLAS[ev.code]) comando[TECLAS[ev.code]] = false; });
-addEventListener('blur', () => { comando.acelerar = comando.frear = false; });
+addEventListener('blur', () => { for (const k of ['acelerar', 'frear', 'esquerda', 'direita']) comando[k] = false; });
 
 // ═════════════════ DESENHAR ═════════════════
-const m4 = new THREE.Matrix4();
+const m4 = new THREE.Matrix4(), olhoSuave = new THREE.Vector3(), alvoCam = new THREE.Vector3();
 function desenhar(dt) {
-    const x = e.x;
-    veiculo.position.x = x;
-    for (const r of rodas) r.rotation.y -= e.v * dt / .38;          // a roda gira na velocidade do carro
+    const vel = e.v * 3.6;
+    for (const r of rodas) r.rotation.y -= (e.v - pos.re) * dt / .38;   // a roda gira na velocidade do carro
     luzFreio.material.emissive.setHex(comando.frear && e.v > 0 ? 0xff1a1a : 0x000000);
     const queimando = e.f.foguete > 0;
     for (const ch of chamas) { ch.visible = queimando; ch.scale.set(1, .8 + Math.random() * .6, 1); }
-    // faixas e postes "reciclados" perto do carro
-    const base = Math.floor(x / FAIXA) * FAIXA - 15 * FAIXA;
-    for (let i = 0; i < N_FAIXAS; i++) {
-        faixas.setMatrixAt(i, m4.makeTranslation(base + i * FAIXA, .01, 0));
-        bordas.setMatrixAt(2 * i, m4.makeTranslation(base + i * FAIXA, .015, 6));
-        bordas.setMatrixAt(2 * i + 1, m4.makeTranslation(base + i * FAIXA + FAIXA / 2, .015, -6));
+    if (modo === 'arrancada') {
+        const x = e.x;
+        veiculo.position.set(x, 0, 0);
+        const base = Math.floor(x / FAIXA) * FAIXA - 15 * FAIXA;
+        for (let i = 0; i < N_FAIXAS; i++) {
+            faixas.setMatrixAt(i, m4.makeTranslation(base + i * FAIXA, .01, 0));
+            bordas.setMatrixAt(2 * i, m4.makeTranslation(base + i * FAIXA, .015, 6));
+            bordas.setMatrixAt(2 * i + 1, m4.makeTranslation(base + i * FAIXA + FAIXA / 2, .015, -6));
+        }
+        faixas.instanceMatrix.needsUpdate = bordas.instanceMatrix.needsUpdate = true;
+        const primeiro = Math.max(1, Math.floor(x / POSTE));
+        postes.forEach((p, i) => atualizarPoste(p, (primeiro + i) * POSTE));
+        grama.position.x = asfalto.position.x = x;
+        camera.fov = 55 + Math.min(vel / 400, 1) * 25;
+        camera.position.set(x - 9 - Math.min(vel / 100, 3), 3.4, 3.2 + Math.sin(e.t * 30) * Math.min(vel / 4000, .05));
+        camera.lookAt(x + 6, .8, 0);
+        $('m-dist').textContent = num(x);
+    } else {
+        veiculo.position.set(pos.x, pos.y, pos.z);
+        veiculo.rotation.y = pos.rumo;
+        veiculo.rotation.z = pos.voando ? Math.max(-.25, Math.min(.25, pos.vy * .02)) : alturaDoChao(pos.x, pos.z) > 0 ? Math.atan(3.2 / 16) : 0;
+        veiculo.rotation.x = pos.derrapando ? Math.sign(pos.volante) * -.05 : 0;
+        for (const r of raios) if (!r.pego) { r.obj.rotation.y += dt * 2; r.obj.position.y = 1.6 + Math.sin(performance.now() / 300 + r.x) * .3; }
+        // câmera atrás do carro, chegando "macia" na posição
+        const dir = new THREE.Vector3(Math.cos(pos.rumo), 0, -Math.sin(pos.rumo));
+        alvoCam.set(pos.x, pos.y, pos.z).addScaledVector(dir, -10 - Math.min(vel / 60, 4)).setY(pos.y + 4.2);
+        olhoSuave.lerp(alvoCam, 1 - Math.exp(-dt * 6));
+        if (olhoSuave.distanceTo(alvoCam) > 40) olhoSuave.copy(alvoCam);
+        camera.position.copy(olhoSuave);
+        camera.fov = 60 + Math.min(vel / 300, 1) * 20;
+        camera.lookAt(pos.x + dir.x * 6, pos.y + 1, pos.z + dir.z * 6);
+        $('m-dist').textContent = num(e.x);
+        desenharMinimapa();
     }
-    faixas.instanceMatrix.needsUpdate = bordas.instanceMatrix.needsUpdate = true;
-    const primeiro = Math.max(1, Math.floor(x / POSTE));
-    postes.forEach((p, i) => atualizarPoste(p, (primeiro + i) * POSTE));
-    grama.position.x = asfalto.position.x = x;
-    // câmera atrás do carro; quanto mais rápido, mais "abre" a visão
-    const vel = e.v * 3.6;
-    camera.fov = 55 + Math.min(vel / 400, 1) * 25; camera.updateProjectionMatrix();
-    camera.position.set(x - 9 - Math.min(vel / 100, 3), 3.4, 3.2 + Math.sin(e.t * 30) * Math.min(vel / 4000, .05));
-    camera.lookAt(x + 6, .8, 0);
-    sol.position.set(x - 20, 40, 20); sol.target.position.set(x, 0, 0);
-    // mostradores
-    $('m-vel').textContent = num(vel);
-    $('m-g').textContent = num(Math.abs(e.a) / G, 1);
-    $('m-dist').textContent = num(x);
+    camera.updateProjectionMatrix();
+    sol.position.set(veiculo.position.x - 20, 40, veiculo.position.z + 20); sol.target.position.copy(veiculo.position);
+    if (recadoAte !== Infinity && performance.now() > recadoAte && $('recado').textContent) $('recado').textContent = '';
+    $('m-vel').textContent = num(pos.re > 0 ? pos.re * 3.6 : vel) + (pos.re > 0 ? ' R' : '');
+    $('m-g').textContent = num(modo === 'mundo' ? pos.aderenciaUsada * carro.aderencia : Math.abs(e.a) / G, 1);
     $('m-tempo').textContent = num(e.t, 2);
     const bat = 100 * e.energia / carro.bateria_kwh;
     $('m-bat').textContent = num(bat, bat < 99.95 ? 1 : 0) + '%'; $('t-bat').style.width = bat + '%';
     if (carro.foguete_s) { $('m-fog').textContent = num(e.fogueteRestante, 1) + ' s'; $('t-fog').style.width = 100 * e.fogueteRestante / carro.foguete_s + '%'; }
+}
+
+const mapa = $('minimapa').getContext('2d');
+function desenharMinimapa() {
+    if (!mapaFundo) return;
+    const lado = 2 * MUNDO + 200, s = 320 / lado, px = (v) => (v + lado / 2) * s;
+    mapa.drawImage(mapaFundo, 0, 0);
+    mapa.fillStyle = '#ffd23f';
+    for (const r of raios) if (!r.pego) { mapa.beginPath(); mapa.arc(px(r.x), px(r.z), 5, 0, 7); mapa.fill(); }
+    mapa.save(); mapa.translate(px(pos.x), px(pos.z)); mapa.rotate(-pos.rumo);
+    mapa.fillStyle = '#ff3b4a'; mapa.strokeStyle = '#fff'; mapa.lineWidth = 2;
+    mapa.beginPath(); mapa.moveTo(12, 0); mapa.lineTo(-8, 7); mapa.lineTo(-8, -7); mapa.closePath(); mapa.fill(); mapa.stroke();
+    mapa.restore();
 }
 
 function redimensionar() {
@@ -483,7 +731,7 @@ renderer.setAnimationLoop(() => {
     if ((painelT += dt) > .1) { painelT = 0; desenharForcas(); }   // o painel não precisa de 60 quadros
     renderer.render(cena, camera);
 });
-desenharResultados(); desenharSobre(); desenharForcas();
+recomecar(); desenharSobre(); desenharForcas();
 </script>
 </body>
 </html>
