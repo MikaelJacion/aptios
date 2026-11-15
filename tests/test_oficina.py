@@ -4,13 +4,14 @@ from fastapi.testclient import TestClient
 
 from aptios.interface.web import criar_app
 from aptios.oficina.aplicacao import ExploradorNaoEncontrado, Oficina
-from aptios.oficina.catalogo import CATALOGO, PACOTES
+from aptios.oficina.batalha import Atributos, calcular_atributos, lutar
+from aptios.oficina.catalogo import CATALOGO, PACOTES, RIVAIS
 from aptios.oficina.dominio import Explorador, PecaColocada, RegraDaOficina
 from aptios.oficina.infra import ExploradoresEmMemoria, ExploradoresSQLite, PagamentoDesativado
 
 
 def oficina(repo=None):
-    return Oficina(CATALOGO, repo or ExploradoresEmMemoria(), PagamentoDesativado(), PACOTES)
+    return Oficina(CATALOGO, repo or ExploradoresEmMemoria(), PagamentoDesativado(), PACOTES, RIVAIS)
 
 
 # ── Domínio ──────────────────────────────────────────────────────
@@ -54,9 +55,9 @@ def test_nao_compra_sem_saldo_e_nao_compra_duas_vezes():
 def test_so_monta_com_pecas_que_tem():
     e = Explorador("abc")
     e.receber_presentes(CATALOGO)
-    e.montar([PecaColocada("bloco_2x2", 0, 0, 0, 0)])
+    e.montar([PecaColocada("bloco_2x2", 0, 0, 0, 0)], CATALOGO)
     with pytest.raises(RegraDaOficina):
-        e.montar([PecaColocada("garra", 0, 0, 0, 0)])
+        e.montar([PecaColocada("garra", 0, 0, 0, 0)], CATALOGO)
 
 
 def test_peca_so_gira_de_90_em_90():
@@ -120,3 +121,68 @@ def test_fluxo_completo_pelo_site():
     assert r.status_code == 200 and len(r.json()["robo"]) == 1
 
     assert c.get("/api/oficina/eu", headers={"X-Explorador": "chute"}).status_code == 404
+
+
+# ── Encaixe, níveis e batalha ────────────────────────────────────
+
+def test_pecas_nao_podem_ocupar_o_mesmo_lugar_nem_sair_da_bancada():
+    e = Explorador("abc")
+    e.receber_presentes(CATALOGO)
+    with pytest.raises(RegraDaOficina):
+        e.montar([PecaColocada("bloco_2x2", 0, 0, 0, 0), PecaColocada("bloco_2x2", 1, 0, 1, 0)], CATALOGO)
+    with pytest.raises(RegraDaOficina):
+        e.montar([PecaColocada("bloco_2x4", 11, 0, 0, 0)], CATALOGO)
+    e.montar([PecaColocada("bloco_2x2", 0, 0, 0, 0), PecaColocada("bloco_2x2", 0, 1, 0, 0)], CATALOGO)  # empilhar pode
+
+
+def test_tem_desafios_dos_tres_niveis_e_os_dificeis_pagam_mais():
+    por_nivel = {}
+    for d in CATALOGO.desafios.values():
+        por_nivel.setdefault(d.nivel, []).append(d.recompensa)
+    assert set(por_nivel) == {"facil", "medio", "dificil"}
+    assert max(por_nivel["facil"]) < min(por_nivel["medio"]) < min(por_nivel["dificil"])
+
+
+def test_rivais_sao_robos_validos_e_ficam_mais_fortes():
+    forca = []
+    for r in RIVAIS:
+        from aptios.oficina.dominio import validar_encaixe
+        validar_encaixe(list(r.pecas), CATALOGO)
+        a = calcular_atributos(r.pecas, CATALOGO)
+        forca.append(a.vida + a.ataque * 4 + a.velocidade * 3 + a.precisao)
+    assert forca == sorted(forca)
+
+
+def test_robo_sem_controlador_nao_luta():
+    with pytest.raises(RegraDaOficina):
+        calcular_atributos([PecaColocada("bloco_2x2", 0, 0, 0, 0)], CATALOGO)
+
+
+def test_mesma_semente_mesma_luta():
+    forte = Atributos(vida=150, ataque=40, defesa=10, velocidade=15, precisao=90)
+    fraco = Atributos(vida=80, ataque=6, defesa=2, velocidade=2, precisao=55)
+    assert lutar(forte, fraco, 7) == lutar(forte, fraco, 7)
+    vitorias = sum(lutar(forte, fraco, s)[1] == "voce" for s in range(50))
+    assert vitorias >= 45  # o mais forte quase sempre ganha
+
+
+def test_premio_da_vitoria_so_na_primeira_vez():
+    e = Explorador("abc")
+    assert e.registrar_vitoria("lata_velha", 20) == 20
+    assert e.registrar_vitoria("lata_velha", 20) == 0
+    assert e.saldo == 20
+
+
+def test_batalha_pelo_site():
+    c = TestClient(criar_app(TutorQueNaoFala(), oficina()))
+    h = {"X-Explorador": c.post("/api/oficina/exploradores").json()["codigo"]}
+    assert c.get("/api/oficina/arena", headers=h).json()["problema"]  # robô vazio
+    carrinho = [{"peca_id": p, "x": x, "y": y, "z": z, "giro": 0} for p, x, y, z in [
+        ("placa_4x6", -2, 0, -3), ("controlador", -1, 1, -2), ("roda_pequena", -3, 0, -3),
+        ("roda_pequena", 2, 0, -3), ("roda_pequena", -3, 0, 1), ("roda_pequena", 2, 0, 1)]]
+    assert c.put("/api/oficina/robo", headers=h, json={"pecas": carrinho}).status_code == 200
+    arena = c.get("/api/oficina/arena", headers=h).json()
+    assert arena["meus_atributos"] and len(arena["rivais"]) == 3
+    r = c.post("/api/oficina/batalhas/lata_velha", headers=h).json()
+    assert r["vencedor"] in ("voce", "rival", "empate") and r["golpes"]
+    assert r["saldo"] == r["premio"]

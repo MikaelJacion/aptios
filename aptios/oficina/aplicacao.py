@@ -9,6 +9,7 @@ import secrets
 from dataclasses import asdict
 from typing import Any, Iterable, Mapping
 
+from aptios.oficina.batalha import Rival, calcular_atributos, lutar
 from aptios.oficina.dominio import (
     Catalogo, Explorador, Exploradores, PacoteDeTokens, Pagamentos, PecaColocada, RegraDaOficina,
 )
@@ -20,11 +21,13 @@ class ExploradorNaoEncontrado(LookupError):
 
 class Oficina:
     def __init__(self, catalogo: Catalogo, exploradores: Exploradores,
-                 pagamentos: Pagamentos, pacotes: Iterable[PacoteDeTokens]) -> None:
+                 pagamentos: Pagamentos, pacotes: Iterable[PacoteDeTokens],
+                 rivais: Iterable[Rival] = ()) -> None:
         self.catalogo = catalogo
         self.exploradores = exploradores
         self.pagamentos = pagamentos
         self.pacotes = {p.id: p for p in pacotes}
+        self.rivais = {r.id: r for r in rivais}
 
     # ── consultas ───────────────────────────────────────────────
     def catalogo_publico(self) -> dict[str, Any]:
@@ -71,9 +74,43 @@ class Oficina:
         for p in pecas:
             self.catalogo.peca(str(p["peca_id"]))  # a peça precisa existir
             robo.append(PecaColocada(str(p["peca_id"]), int(p["x"]), int(p["y"]), int(p["z"]), int(p["giro"])))
-        explorador.montar(robo)
+        explorador.montar(robo, self.catalogo)
         self.exploradores.salvar(explorador)
         return self._publico(explorador)
+
+    def arena(self, codigo: str) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        try:
+            meus, problema = asdict(calcular_atributos(explorador.robo, self.catalogo)), None
+        except RegraDaOficina as erro:
+            meus, problema = None, str(erro)
+        return {
+            "meus_atributos": meus,
+            "problema": problema,
+            "rivais": [
+                {"id": r.id, "nome": r.nome, "nivel": r.nivel, "premio": r.premio, "descricao": r.descricao,
+                 "atributos": asdict(calcular_atributos(r.pecas, self.catalogo)),
+                 "pecas": [asdict(c) for c in r.pecas], "vencido": r.id in explorador.vitorias}
+                for r in self.rivais.values()
+            ],
+        }
+
+    def batalhar(self, codigo: str, rival_id: str) -> dict[str, Any]:
+        """A luta é decidida AQUI no servidor, com o robô que está salvo."""
+        explorador = self._buscar(codigo)
+        rival = self.rivais.get(rival_id)
+        if not rival:
+            raise RegraDaOficina("rival desconhecido")
+        voce = calcular_atributos(explorador.robo, self.catalogo)
+        dele = calcular_atributos(rival.pecas, self.catalogo)
+        golpes, vencedor = lutar(voce, dele, semente=secrets.randbelow(2**31))
+        premio = explorador.registrar_vitoria(rival.id, rival.premio) if vencedor == "voce" else 0
+        self.exploradores.salvar(explorador)
+        return {
+            "voce": asdict(voce), "rival": asdict(dele),
+            "golpes": [asdict(g) for g in golpes], "vencedor": vencedor, "premio": premio,
+            **self._publico(explorador),
+        }
 
     def comprar_tokens(self, codigo: str, pacote_id: str) -> dict[str, str]:
         explorador = self._buscar(codigo)
@@ -96,4 +133,5 @@ class Oficina:
             "pecas": sorted(e.pecas),
             "desafios_feitos": sorted(e.desafios_feitos),
             "robo": [asdict(c) for c in e.robo],
+            "vitorias": sorted(e.vitorias),
         }

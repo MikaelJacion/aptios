@@ -46,6 +46,7 @@ class Desafio:
     correta: int  # índice da opção certa
     recompensa: int
     explicacao: str
+    nivel: Literal["facil", "medio", "dificil"] = "facil"
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ class Explorador:
     pecas: set[str] = field(default_factory=set)
     desafios_feitos: set[str] = field(default_factory=set)
     robo: list[PecaColocada] = field(default_factory=list)
+    vitorias: set[str] = field(default_factory=set)  # rivais que já venceu
 
     MAX_PECAS_NO_ROBO = 300
 
@@ -108,12 +110,21 @@ class Explorador:
             raise RegraDaOficina("quantidade de tokens inválida")
         self.saldo += tokens
 
-    def montar(self, robo: list[PecaColocada]) -> None:
+    def registrar_vitoria(self, rival_id: str, premio: int) -> int:
+        """Vencer um rival paga tokens só na PRIMEIRA vez. Revanche vale pela glória!"""
+        if rival_id in self.vitorias:
+            return 0
+        self.vitorias.add(rival_id)
+        self.saldo += premio
+        return premio
+
+    def montar(self, robo: list[PecaColocada], catalogo: Catalogo) -> None:
         if len(robo) > self.MAX_PECAS_NO_ROBO:
             raise RegraDaOficina(f"o robô pode ter no máximo {self.MAX_PECAS_NO_ROBO} peças")
         faltando = {c.peca_id for c in robo} - self.pecas
         if faltando:
             raise RegraDaOficina(f"você ainda não tem: {', '.join(sorted(faltando))}")
+        validar_encaixe(robo, catalogo)
         self.robo = list(robo)
 
 
@@ -133,6 +144,29 @@ class Catalogo:
             return self.desafios[desafio_id]
         except KeyError:
             raise RegraDaOficina(f"desafio desconhecido: {desafio_id}") from None
+
+
+LIMITE_BANCADA = 12  # a bancada vai de -12 a +12 pinos
+
+
+def celulas(peca: Peca, c: PecaColocada) -> set[tuple[int, int, int]]:
+    """Os "cubinhos" da grade que a peça ocupa. Girar 90° troca largura e profundidade."""
+    w, h, d = peca.tamanho
+    if c.giro % 180:
+        w, d = d, w
+    return {(c.x + i, c.y + j, c.z + k) for i in range(w) for j in range(h) for k in range(d)}
+
+
+def validar_encaixe(robo: list[PecaColocada], catalogo: Catalogo) -> None:
+    """Duas peças não ocupam o mesmo lugar, e nenhuma sai da bancada."""
+    ocupado: set[tuple[int, int, int]] = set()
+    for c in robo:
+        cubos = celulas(catalogo.peca(c.peca_id), c)
+        if any(not (-LIMITE_BANCADA <= x < LIMITE_BANCADA and -LIMITE_BANCADA <= z < LIMITE_BANCADA) for x, _, z in cubos):
+            raise RegraDaOficina("uma peça saiu da bancada")
+        if cubos & ocupado:
+            raise RegraDaOficina("duas peças estão no mesmo lugar")
+        ocupado |= cubos
 
 
 # ── PORTAS: o que o domínio precisa do mundo lá fora ─────────────
