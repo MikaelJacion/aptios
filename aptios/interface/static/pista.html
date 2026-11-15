@@ -98,6 +98,22 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 .chip { font: 600 .82rem var(--fonte-titulo); border: 1px solid var(--linha); background: var(--fundo); color: var(--tinta); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--tinta); color: var(--painel); border-color: var(--tinta); }
 .botao:disabled { opacity: .45; cursor: not-allowed; }
+.botao-ia { font: 600 .9rem var(--fonte-titulo); border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; background: var(--azul); color: var(--azul-tinta); }
+.botao-ia:focus-visible, .ia-fechar:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+.ia {
+    position: fixed; right: 16px; bottom: 16px; z-index: 10; width: min(400px, calc(100vw - 32px)); height: min(70vh, 560px);
+    background: var(--painel); color: var(--tinta); border: 1px solid var(--linha); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.28);
+    display: flex; flex-direction: column; gap: 8px; padding: 12px;
+}
+.ia header { display: flex; align-items: center; justify-content: space-between; font: 600 1.05rem var(--fonte-titulo); }
+.ia-fechar { border: 0; background: var(--fundo); color: var(--tinta); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; }
+.ia-msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.balao { padding: 8px 12px; border-radius: 12px; font-size: .9rem; white-space: pre-wrap; max-width: 92%; }
+.balao.eu { align-self: flex-end; background: var(--azul); color: var(--azul-tinta); }
+.balao.ia-msg { align-self: flex-start; background: var(--fundo); }
+.ia-form { display: flex; gap: 6px; }
+.ia-form input { flex: 1; min-width: 0; font: inherit; border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; background: var(--fundo); color: var(--tinta); }
+.ia-form .botao { padding: 8px 14px; box-shadow: none; background: var(--azul); color: var(--azul-tinta); }
 @media (max-width: 860px) {
     .pista { grid-template-columns: 1fr; }
     .cena { height: 64vh; }
@@ -126,6 +142,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
     </div>
     <span class="demo" id="selo-demo" hidden>modo demonstração</span>
     <span class="espaco"></span>
+    <button class="botao-ia" id="b-ia" aria-expanded="false" aria-controls="ia">🤖 Pergunte à IA</button>
     <a class="link" id="link-oficina" href="/oficina">🧱 Oficina</a>
     <a class="link" id="link-tutor" href="/">🤖 Tutor</a>
 </header>
@@ -164,7 +181,9 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
         <section id="sec-mundo" hidden>
             <h2>🌎 Mundo aberto</h2>
             <p class="explica">Dirija pela cidade com <b>▲ ▼ ◀ ▶</b> (ou W A S D). Pegue os <b>⚡ raios de energia</b>, pule nas <b>rampas</b> e não bata nos prédios! Segure ▼ parado para dar ré. Com o Roadster, aperte <b>🛸 Voar</b> (V) e use Q / E para subir e descer.</p>
-            <p style="margin:10px 0 0">⚡ Raios: <span class="contador" id="contador-raios">0 / 0</span></p>
+            <p style="margin:10px 0 0">⚡ Raios: <span class="contador" id="contador-raios">0 / 0</span> &nbsp; 🚁 Helipontos: <span class="contador" id="contador-heli">0 / 3</span></p>
+            <p class="explica" style="margin-top:8px" id="texto-corrida"></p>
+            <p class="explica" style="margin-top:8px" id="texto-posto">🔌 Postos de recarga: pare no piso verde (debaixo do teto branco) para carregar a bateria.</p>
         </section>
         <section id="sec-voo" hidden>
             <h2>🛸 Voo</h2>
@@ -206,6 +225,16 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
         </section>
     </aside>
 </main>
+
+<aside class="ia" id="ia" hidden aria-label="Pergunte à IA">
+    <header><strong>🤖 IA da Pista</strong><button class="ia-fechar" id="ia-fechar" aria-label="Fechar">✕</button></header>
+    <div class="ia-msgs" id="ia-msgs" aria-live="polite"></div>
+    <div class="chips" id="ia-sugestoes"></div>
+    <form class="ia-form" id="ia-form">
+        <input id="ia-campo" maxlength="700" autocomplete="off" placeholder="Pergunte sobre física e carros…" aria-label="Sua pergunta">
+        <button class="botao" id="ia-enviar">Enviar</button>
+    </form>
+</aside>
 
 <script type="module">
 import * as THREE from 'three';
@@ -282,7 +311,7 @@ caixa.prepend(renderer.domElement);
 const cena = new THREE.Scene();
 cena.background = new THREE.Color(cor('--ceu'));
 cena.fog = new THREE.Fog(cena.background, 60, 260);
-const camera = new THREE.PerspectiveCamera(55, 1, .1, 900);
+const camera = new THREE.PerspectiveCamera(55, 1, .1, 1800);
 cena.add(new THREE.HemisphereLight(0xffffff, 0x445533, 1.1));
 const sol = new THREE.DirectionalLight(0xffffff, 1.6);
 sol.castShadow = true;
@@ -371,7 +400,7 @@ function construirMundo() {
             const cx = x0 + (a + .5) * lote, cz = z0 + (b + .5) * lote;
             const p = new THREE.Mesh(cubo, materiais[Math.floor(sorte() * materiais.length)]);
             p.scale.set(w, h, d); p.position.set(cx, h / 2, cz); p.castShadow = p.receiveShadow = true; mundo.add(p);
-            predios.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, h });
+            predios.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, h, telhado: true });
         }
     }
     const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(.35, .45, 3, 8), mat('#7a5a3a'), arvores.length);
@@ -412,6 +441,7 @@ function construirMundo() {
         const m = new THREE.Mesh(cubo, muroMat); m.scale.set(w, 3, d); m.position.set(x, 1.5, z); mundo.add(m);
         predios.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, h: 3 });
     }
+    construirExtras(sorte);
     // fundo do minimapa (desenhado uma vez só)
     mapaFundo = Object.assign(document.createElement('canvas'), { width: 320, height: 320 });
     const g = mapaFundo.getContext('2d'), s = 320 / lado, px = (v) => (v + lado / 2) * s;
@@ -457,9 +487,83 @@ function moverTrafego(dt) {
     }
 }
 
+// ───────── mais coisas no mundo: postos de recarga, corrida de anéis, helipontos e montanhas ─────────
+const postos = [], checkpoints = [], helipontos = [];
+const corrida = { proximo: 0, inicio: 0 };
+const ROTA = [[-200, 0], [200, 0], [400, 0], [400, -400], [0, -400], [-400, -400], [-400, -200], [-400, 0]];
+function construirExtras(sorte) {
+    // postos de recarga: um piso verde com teto, no meio de ruas verticais
+    for (const [x, z] of [[-200, 100], [400, -300], [0, 500], [-600, -500]]) {
+        const g = new THREE.Group(); g.position.set(x, 0, z);
+        const piso = new THREE.Mesh(new THREE.PlaneGeometry(14, 16), mat('#1f9d55', { roughness: .8 })); piso.rotation.x = -Math.PI / 2; piso.position.y = .02; piso.receiveShadow = true;
+        const teto = new THREE.Mesh(new THREE.BoxGeometry(16, .4, 18), mat('#eef2f6')); teto.position.y = 6.2; teto.castShadow = true;
+        g.add(piso, teto);
+        for (const [a, b] of [[-7.5, -8.5], [7.5, -8.5], [-7.5, 8.5], [7.5, 8.5]]) { const c = new THREE.Mesh(new THREE.BoxGeometry(.4, 6.2, .4), mat('#8a8f98')); c.position.set(a, 3.1, b); g.add(c); }
+        for (const lado of [1, -1]) { const pl = placa('⚡ RECARGA', '#1f9d55', '#ffffff'); pl.scale.set(3.4, 1.6, 1); pl.position.set(0, 7.6, 9 * lado); pl.rotation.y = lado > 0 ? 0 : Math.PI; g.add(pl); }
+        mundo.add(g); postos.push({ x, z });
+    }
+    // corrida: anéis numerados pelas ruas (o caminho passa pela rampa!)
+    ROTA.forEach(([x, z], i) => {
+        const [px, pz] = i ? ROTA[i - 1] : [-600, 0], ang = Math.atan2(x - px, z - pz);
+        const anel = new THREE.Mesh(new THREE.TorusGeometry(6.5, .45, 10, 40), new THREE.MeshStandardMaterial({ color: 0x8a8f98, emissive: 0x000000 }));
+        anel.position.set(x, 6.5, z); anel.rotation.y = ang;
+        const numero = placa(i === ROTA.length - 1 ? '🏁' : String(i + 1), '#e8710a', '#ffffff'); numero.position.set(x, 14.5, z); numero.rotation.y = ang + Math.PI;
+        mundo.add(anel, numero); checkpoints.push({ x, z, anel });
+    });
+    // helipontos nos 3 prédios mais altos: pouse voando!
+    [...predios].filter(p => p.telhado).sort((a, b) => b.h - a.h).slice(0, 3).forEach(p => {
+        const r = Math.min(p.x1 - p.x0, p.z1 - p.z0) * .42, cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2;
+        const pad = new THREE.Mesh(new THREE.CircleGeometry(r, 32), mat('#ffcf33', { emissive: '#ffcf33', emissiveIntensity: .25 }));
+        pad.rotation.x = -Math.PI / 2; pad.position.set(cx, p.h + .03, cz);
+        const h = placa('H', '#ffcf33', '#1b2430'); h.scale.set(r * .5, r, 1); h.rotation.x = -Math.PI / 2; h.position.set(cx, p.h + .05, cz);
+        mundo.add(pad, h); helipontos.push({ predio: p, x: cx, z: cz, visitado: false });
+    });
+    // montanhas ao redor da cidade
+    for (let n = 0; n < 40; n++) {
+        const a = n / 40 * Math.PI * 2 + sorte() * .1, dist = 1050 + sorte() * 350, h = 60 + sorte() * 160;
+        const m = new THREE.Mesh(new THREE.ConeGeometry(80 + sorte() * 90, h, 7), mat(sorte() < .5 ? '#5d7f52' : '#7d8a7a', { flatShading: true, roughness: 1 }));
+        m.position.set(Math.cos(a) * dist, h / 2 - 2, Math.sin(a) * dist); mundo.add(m);
+    }
+    pintarCheckpoints();
+}
+function pintarCheckpoints() {
+    checkpoints.forEach((c, i) => {
+        const proximo = i === corrida.proximo;
+        c.anel.material.color.setHex(proximo ? 0xff8a1f : 0x8a8f98);
+        c.anel.material.emissive.setHex(proximo ? 0xff6a00 : 0x000000);
+        c.anel.scale.setScalar(proximo ? 1 : .85);
+    });
+}
+const RECORDE_CORRIDA = () => 'corrida_' + ORIGINAL.id;
+function verificarExtras(dt) {
+    // anéis da corrida
+    const c = checkpoints[corrida.proximo];
+    if (c && Math.hypot(c.x - pos.x, c.z - pos.z) < 8.5 && pos.y < 13) {
+        if (corrida.proximo === 0) { corrida.inicio = e.t; dizer('🏁 Valendo! Siga os anéis laranja.'); }
+        corrida.proximo++;
+        if (corrida.proximo === checkpoints.length) {
+            const tempo = e.t - corrida.inicio, k = RECORDE_CORRIDA(), antes = recordes[k];
+            if (ehOriginal() && (antes === undefined || tempo < antes)) { recordes[k] = tempo; gravar('aptios_pista_recordes', JSON.stringify(recordes)); }
+            dizer(antes === undefined || tempo < antes ? `🏆 Chegou em ${num(tempo, 1)} s! Novo recorde!` : `🏁 Chegou em ${num(tempo, 1)} s (recorde: ${num(antes, 1)} s)`, 4);
+            corrida.proximo = 0;
+        } else if (corrida.proximo > 1) dizer(`✅ Anel ${corrida.proximo} de ${checkpoints.length}`, 1);
+        pintarCheckpoints();
+    }
+    // helipontos
+    for (const h of helipontos) if (!h.visitado && Math.abs(pos.y - h.predio.h) < .3 && telhadoEm(pos.x, pos.z) === h.predio) {
+        h.visitado = true;
+        e = { ...e, energia: Math.min(carro.bateria_kwh, e.energia + carro.bateria_kwh * .1) };
+        dizer(`🚁 Pousou no heliponto a ${num(h.predio.h)} m de altura! +10% de bateria`, 3);
+    }
+    // posto de recarga: parado (ou bem devagar) no piso verde
+    pos.carregando = !pos.voo && pos.y < .5 && e.v < 4 && pos.re === 0 && postos.some(p => Math.abs(pos.x - p.x) < 7 && Math.abs(pos.z - p.z) < 8);
+    if (pos.carregando) e = { ...e, energia: Math.min(carro.bateria_kwh, e.energia + 250 * dt * 40 / 3600) };   // 250 kW, com o tempo 40× mais rápido
+}
+
+const telhadoEm = (x, z) => predios.find(p => p.telhado && x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1);
 function alturaDoChao(x, z) {
     for (const r of rampas) if (x >= r.x && x <= r.x + r.L && Math.abs(z - r.z) <= r.W / 2) return (x - r.x) / r.L * r.H;
-    return 0;
+    return telhadoEm(x, z)?.h ?? 0;   // em cima de um prédio, o "chão" é o telhado
 }
 const bateu = (x, z, raio = 1.3, y = 0) => predios.some(p => y < p.h && x > p.x0 - raio && x < p.x1 + raio && z > p.z0 - raio && z < p.z1 + raio);
 
@@ -595,7 +699,10 @@ function recomecar() {
     e = estadoInicial(carro); correndo = false; marcas = {}; velMax = 0;
     if (rival) { rival.e = estadoInicial(rival.carro); rival.fim = false; }
     Object.assign(pos, { voo: false, x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity });
-    if (modo === 'mundo') { pos.x = -MUNDO + QUADRA * 2; pos.z = 0; for (const r of raios) { r.pego = false; r.obj.visible = true; } pegos = 0; }
+    if (modo === 'mundo') {
+        pos.x = -MUNDO + QUADRA * 2; pos.z = 0; for (const r of raios) { r.pego = false; r.obj.visible = true; } pegos = 0;
+        corrida.proximo = 0; for (const h of helipontos) h.visitado = false; pintarCheckpoints();
+    }
     dizer(modo === 'mundo' ? 'Explore a cidade! ⚡ Pegue os raios de energia.' : 'Segure ▲ ou o botão verde para acelerar!', 0);
     desenharResultados(); atualizarContador(); atualizarBotoesVoo();
 }
@@ -674,7 +781,7 @@ function andarNoMundo(ds, dt) {
         pos.voando = true; pos.vy = e.v * Math.sin(Math.atan(3.2 / 16));
         dizer(`🛫 Voou a ${num(e.v * 3.6)} km/h!`);
     } else pos.y = chao;
-    coletarRaios();
+    coletarRaios(); verificarExtras(dt);
 }
 function coletarRaios() {
     for (const r of raios) if (!r.pego && Math.hypot(r.x - pos.x, r.z - pos.z) < 3.5 && Math.abs(r.y - pos.y - .6) < 3.5) {
@@ -701,7 +808,7 @@ function voar(ds, dt) {
     if (e.energia <= 0) desligarVoo('🔋 Acabou a bateria no ar!');
     else if (potenciaParaFlutuar(carro) > carro.potencia_kw) desligarVoo('😓 Ficou pesado demais para voar!');
     pos.aderenciaUsada = 0; pos.derrapando = false; pos.raioCurva = Infinity;
-    coletarRaios();
+    coletarRaios(); verificarExtras(dt);
 }
 function alternarVoo() {
     if (modo !== 'mundo') return;
@@ -753,6 +860,14 @@ function desenharForcas() {
         : e.v * 3.6 >= carro.limite_kmh - .5 && !comando.frear ? `🚧 Limitador em ${num(carro.limite_kmh)} km/h: o motor só empurra o suficiente para vencer o ar.`
         : empurra > segura ? `Empurra (${num(empurra)} N) mais do que segura (${num(segura)} N): o carro ACELERA.`
         : `Segura (${num(segura)} N) mais do que empurra (${num(empurra)} N): o carro PERDE velocidade.`;
+    if (modo === 'mundo') {
+        $('contador-heli').textContent = `${helipontos.filter(h => h.visitado).length} / ${helipontos.length}`;
+        const rec = recordes[RECORDE_CORRIDA()];
+        $('texto-corrida').textContent = (corrida.proximo === 0 ? '🏁 Corrida: passe pelo anel laranja 1 para começar (perto da largada, seguindo a rua).'
+            : `🏁 Corrida: vá para o anel ${corrida.proximo + 1} de ${checkpoints.length}. Tempo: ${num(e.t - corrida.inicio, 1)} s.`) + (rec ? ` Recorde: ${num(rec, 1)} s.` : '');
+        $('texto-posto').textContent = pos.carregando ? `🔌 Carregando a 250 kW… bateria em ${num(100 * e.energia / carro.bateria_kwh)}%. Num carregador rápido de verdade, 10 minutos dão uns 40 kWh.`
+            : '🔌 Postos de recarga: pare no piso verde (debaixo do teto branco) para carregar a bateria.';
+    }
     if (modo === 'mundo' && carro.area_voo_m2) {
         const kw = potenciaParaFlutuar(carro), minutos = e.energia / kw * 60;
         $('texto-voo').textContent = kw > carro.potencia_kw
@@ -866,7 +981,7 @@ function trocarModo(novo) {
     const noMundo = modo === 'mundo';
     if (noMundo) construirMundo();
     arrancada.visible = !noMundo; mundo.visible = noMundo;
-    cena.fog.near = noMundo ? 120 : 60; cena.fog.far = noMundo ? 650 : 260;
+    cena.fog.near = noMundo ? 150 : 60; cena.fog.far = noMundo ? 1300 : 260;
     $('modo-arrancada').setAttribute('aria-pressed', !noMundo); $('modo-mundo').setAttribute('aria-pressed', noMundo);
     for (const id of ['sec-mundo', 'sec-curva', 'b-esquerda', 'b-direita', 'minimapa']) $(id).hidden = !noMundo;
     $('sec-arrancada').hidden = noMundo;
@@ -976,6 +1091,11 @@ function desenharMinimapa() {
     for (const c of trafego) { const [x, z] = posicaoNaFaixa(c); mapa.fillRect(px(x) - 2, px(z) - 2, 4, 4); }
     mapa.fillStyle = '#ffd23f';
     for (const r of raios) if (!r.pego) { mapa.beginPath(); mapa.arc(px(r.x), px(r.z), 5, 0, 7); mapa.fill(); }
+    mapa.fillStyle = '#2fbf71';
+    for (const p of postos) mapa.fillRect(px(p.x) - 5, px(p.z) - 5, 10, 10);
+    for (const h of helipontos) { mapa.fillStyle = h.visitado ? '#8a8f98' : '#ffcf33'; mapa.fillRect(px(h.x) - 4, px(h.z) - 4, 8, 8); }
+    const cp = checkpoints[corrida.proximo];
+    if (cp) { mapa.strokeStyle = '#ff8a1f'; mapa.lineWidth = 3; mapa.beginPath(); mapa.arc(px(cp.x), px(cp.z), 8, 0, 7); mapa.stroke(); }
     mapa.save(); mapa.translate(px(pos.x), px(pos.z)); mapa.rotate(-pos.rumo);
     mapa.fillStyle = '#ff3b4a'; mapa.strokeStyle = '#fff'; mapa.lineWidth = 2;
     mapa.beginPath(); mapa.moveTo(12, 0); mapa.lineTo(-8, 7); mapa.lineTo(-8, -7); mapa.closePath(); mapa.fill(); mapa.stroke();
@@ -1001,6 +1121,59 @@ renderer.setAnimationLoop(() => {
     if ((painelT += dt) > .1) { painelT = 0; desenharForcas(); }   // o painel não precisa de 60 quadros
     renderer.render(cena, camera);
 });
+// ═════════════════ IA: o tutor da Aptios, com o "kit" da Pista ═════════════════
+// A IA mora no SERVIDOR (é lá que fica a chave). A página só manda a pergunta
+// e um resuminho do que está acontecendo no jogo, entre colchetes.
+let historicoIA = [], iaOcupada = false;
+const SUGESTOES_IA = ['Por que o carro derrapa na curva?', 'Por que é tão difícil passar de 400 km/h?', 'Como o carro consegue voar?', 'Por que o ônibus acelera tão devagar?'];
+function balaoIA(quem, texto) {
+    const b = el('div', { className: 'balao ' + (quem === 'eu' ? 'eu' : 'ia-msg'), textContent: texto });
+    $('ia-msgs').append(b); b.scrollIntoView({ block: 'end' }); return b;
+}
+function abrirIA(abrir) {
+    $('ia').hidden = !abrir; $('b-ia').setAttribute('aria-expanded', abrir);
+    for (const k of ['acelerar', 'frear', 'esquerda', 'direita', 'subir', 'descer']) comando[k] = false;
+    if (abrir) {
+        if (!$('ia-msgs').childElementCount) balaoIA('ia', 'Oi! Eu sou a IA da Pista. 🏎️ Pergunte qualquer coisa sobre carros, forças, curvas, baterias ou voo. Eu vejo o que está acontecendo no seu jogo agora!');
+        $('ia-campo').focus();
+    }
+}
+$('b-ia').onclick = () => abrirIA($('ia').hidden);
+$('ia-fechar').onclick = () => abrirIA(false);
+$('ia-sugestoes').append(...SUGESTOES_IA.map(t => el('button', { className: 'chip', type: 'button', textContent: t, onclick: () => perguntarIA(t) })));
+$('ia-form').onsubmit = (ev) => { ev.preventDefault(); perguntarIA($('ia-campo').value.trim()); };
+async function perguntarIA(pergunta) {
+    if (!pergunta || iaOcupada) return;
+    iaOcupada = true; $('ia-enviar').disabled = true; $('ia-campo').value = '';
+    balaoIA('eu', pergunta);
+    const resposta = balaoIA('ia', '…');
+    if (demo) {
+        resposta.textContent = '🔌 Nesta prévia a IA não funciona: ela mora no servidor da Aptios. Lá no site de verdade, ela responde aqui mesmo (depois que um adulto colocar a chave).';
+        iaOcupada = false; $('ia-enviar').disabled = false; return;
+    }
+    const contexto = `[Pista: ${carro.nome}, ${modo === 'mundo' ? 'mundo aberto' : 'arrancada'}, ${num(e.v * 3.6)} km/h${pos.voo ? ', voando a ' + num(pos.y) + ' m' : ''}${pos.derrapando ? ', derrapando' : ''}${ehOriginal() ? '' : `, modificado no Laboratório (${num(carro.massa_kg)} kg, ${num(carro.potencia_kw)} kW, μ=${num(carro.aderencia, 2)})`}] `;
+    let texto = '';
+    try {
+        const r = await fetch('/api/perguntar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kit: 'pista', pergunta: contexto + pergunta, historico: historicoIA.slice(-40) }) });
+        if (!r.ok) {
+            const erro = await r.json().catch(() => ({}));
+            texto = '⚠️ ' + (typeof erro.detail === 'string' ? erro.detail : 'Não consegui enviar. Tente de novo.');
+        } else {
+            const leitor = r.body.getReader(), dec = new TextDecoder();
+            for (;;) {
+                const { value, done } = await leitor.read();
+                if (done) break;
+                texto += dec.decode(value, { stream: true });
+                resposta.textContent = texto.replace(/\*\*/g, ''); resposta.scrollIntoView({ block: 'end' });
+            }
+            if (texto.trim()) historicoIA.push({ autor: 'estudante', texto: contexto + pergunta }, { autor: 'tutor', texto });
+        }
+    } catch { texto = '📡 Sem conexão com a IA. Confira a internet e tente de novo.'; }
+    resposta.textContent = (texto || '🤔 Não veio resposta. Tente perguntar de outro jeito.').replace(/\*\*/g, '');
+    iaOcupada = false; $('ia-enviar').disabled = false; $('ia-campo').focus();
+}
+
 montarLaboratorio(); desenharGaragem(); desenharRivais(); recomecar(); desenharSobre(); desenharForcas();
 </script>
 </body>

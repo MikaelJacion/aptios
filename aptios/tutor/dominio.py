@@ -18,6 +18,7 @@ class Kit(str, Enum):
     LEGO_SPIKE = "lego_spike"
     LEGO_EV3 = "lego_ev3"
     ARDUINO = "arduino"
+    PISTA = "pista"  # o simulador de carros elétricos da Aptios
 
     @property
     def nome(self) -> str:
@@ -26,6 +27,7 @@ class Kit(str, Enum):
             Kit.LEGO_SPIKE: "LEGO SPIKE",
             Kit.LEGO_EV3: "LEGO Mindstorms EV3",
             Kit.ARDUINO: "Arduino",
+            Kit.PISTA: "Pista (física dos carros)",
         }[self]
 
 
