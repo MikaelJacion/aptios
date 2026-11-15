@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from aptios.oficina.aplicacao import ExploradorNaoEncontrado, Oficina
 from aptios.oficina.dominio import RegraDaOficina
+from aptios.pista.fisica import ROADSTER, ficha
 from aptios.tutor.aplicacao import montar_conversa, perguntar
 from aptios.tutor.dominio import MensagemInvalida, Tutor
 
@@ -96,6 +97,15 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
     async def pagina_oficina() -> FileResponse:
         return FileResponse(PASTA_ESTATICA / "oficina.html")
 
+    @app.get("/pista")
+    async def pagina_pista() -> FileResponse:
+        return FileResponse(PASTA_ESTATICA / "pista.html")
+
+    # ── pista ── (a página faz a física ao vivo; aqui vai a ficha "oficial")
+    @app.get("/api/pista/carro")
+    async def carro() -> dict:
+        return dados_da_pista()
+
     # ── tutor ──
     @app.post("/api/perguntar")
     async def api_perguntar(pedido: Pedido, request: Request) -> StreamingResponse:
@@ -163,6 +173,11 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
     # Modelos 3D (.glb) feitos no Meshy ficam em static/modelos/
     app.mount("/static", StaticFiles(directory=PASTA_ESTATICA), name="static")
     return app
+
+
+def dados_da_pista() -> dict:
+    from dataclasses import asdict
+    return {"carro": asdict(ROADSTER), "ficha": ficha(ROADSTER), "ficha_foguete": ficha(ROADSTER, foguete=True)}
 
 
 def _app_padrao() -> FastAPI:

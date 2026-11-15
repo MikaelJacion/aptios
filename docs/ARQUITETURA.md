@@ -1,8 +1,8 @@
 # Arquitetura da Aptios
 
-## Dois contextos delimitados
+## Três contextos delimitados
 
-A Aptios tem dois **contextos delimitados**: o **Tutor** e a **Oficina**. Cada um tem o próprio domínio e o próprio vocabulário. Um não importa nada do outro. Se o tutor mudar, a oficina continua funcionando.
+A Aptios tem três **contextos delimitados**: o **Tutor**, a **Oficina** e a **Pista** (`aptios/pista`, o simulador de carro elétrico). Cada um tem o próprio domínio e o próprio vocabulário. Um não importa nada do outro. Se o tutor mudar, a oficina continua funcionando.
 
 Um exemplo do porquê: a palavra **"token"**. Na Oficina, é a moeda que a criança ganha. No mundo da IA, "token" é um pedaço de palavra. Se tudo estivesse misturado, essa palavra teria dois sentidos no mesmo código. Separando os contextos, cada palavra tem um sentido só dentro do seu contexto. Isso é a **Linguagem Ubíqua**.
 
@@ -52,6 +52,8 @@ As setas mostram quem **conhece** quem. O **domínio fica no centro e não conhe
 
 - **ADR-005: o código do explorador vai no cabeçalho `X-Explorador`.** Ele não vai no endereço, para não aparecer no histórico do navegador nem nos registros do servidor. Também não pedimos nome nem e-mail da criança.
 - **ADR-006: a compra com dinheiro está desligada.** Para vender a menores, é preciso uma conta e autorização do responsável, a confirmação do pagamento por webhook e cumprir a LGPD e o ECA Digital. O domínio já tem `creditar_compra()`, e só falta o adaptador.
+- **ADR-007: a física da Pista existe em dois lugares.** A fonte da verdade é `aptios/pista/fisica.py`, que é pura e tem testes (Newton, arrasto ao quadrado, pneu que patina). Mas um carro precisa ser calculado 240 vezes por segundo, e mandar cada passo pela internet seria lento demais. Por isso a página tem uma cópia das contas, e o servidor só entrega a ficha técnica "oficial". Na Arena é o contrário: lá vale token, então quem decide é o servidor. **Regra:** onde há prêmio, decide o servidor; onde é só aprender e brincar, a tela pode calcular.
+- **ADR-008: nada de marca de outra empresa no produto.** O carro se chama "Roadster Elétrico" e usa números aproximados das promessas anunciadas. Ele não tem logotipo nem nome de fabricante, como já fazemos com as peças de montar.
 
 ## Próximos passos sugeridos
 

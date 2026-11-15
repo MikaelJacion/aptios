@@ -175,6 +175,7 @@ body {
     <h1 class="marca">Aptios <small>Oficina</small></h1>
     <span class="demo" id="selo-demo" hidden>modo demonstração</span>
     <span class="espaco"></span>
+    <a class="link" id="link-pista" href="/pista">🏎 Pista</a>
     <a class="link" id="link-tutor" href="/">🤖 Tutor</a>
     <span class="saldo" id="saldo" title="Seus tokens">⚙ <span id="saldo-num">0</span> tokens</span>
 </header>
@@ -967,7 +968,7 @@ document.querySelectorAll('.aba').forEach(b => b.onclick = () => { if (!luta) { 
 
 // ═════════════════════════ COMEÇAR ═════════════════════════
 (async () => {
-    if (api.demo) { $('selo-demo').hidden = false; $('link-tutor').hidden = true; }
+    if (api.demo) { $('selo-demo').hidden = false; $('link-tutor').hidden = $('link-pista').hidden = true; }
     try {
         catalogo = await api.catalogo();
         eu = await api.entrar();
