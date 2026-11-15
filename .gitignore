@@ -7,3 +7,6 @@ __pycache__/
 
 # modelos 3D do Meshy (licença privada do Mikael; não vão para o GitHub)
 aptios/interface/static/modelos/*.glb
+
+# fotos de referência (podem ter direitos de outras pessoas)
+/roadster.jpg

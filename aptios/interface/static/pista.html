@@ -405,19 +405,20 @@ function perfil(pontos) {
     return s;
 }
 const esticar = (forma, largura, borda) => new THREE.ExtrudeGeometry(forma, { depth: largura, bevelEnabled: true, bevelThickness: borda, bevelSize: borda, bevelSegments: 5, curveSegments: 16 }).translate(0, 0, -largura / 2);
-add(esticar(perfil([[-2.25, .32], [2.2, .3], [2.42, .42, 2.3, .52], [1.3, .72, .6, .84], [-.2, .9], [-1.3, .9, -2.05, .86], [-2.3, .8, -2.3, .55], [-2.25, .32]]), 1.7, .14), pintura, 0, 0, 0);
-add(esticar(perfil([[.75, .84], [-.05, 1.2, -.95, .9], [.75, .84]]), 1.2, .08), mat(0x111820, { metalness: .5, roughness: .08 }), 0, 0, 0);   // vidros
-add(new THREE.BoxGeometry(.06, .05, 1.5), mat(0xffffff, { emissive: 0xdff3ff, emissiveIntensity: 1.2 }), 2.38, .5, 0);                         // faróis de LED
-for (const z of [-.86, .86]) add(new THREE.BoxGeometry(.9, .12, .06), mat(0x15171a), .2, .5, z);                                                // entradas de ar
-add(new THREE.BoxGeometry(.4, .05, 1.75), pintura, -2.05, 1.08, 0);                                                                              // aerofólio
-for (const z of [-.6, .6]) add(new THREE.BoxGeometry(.08, .2, .08), mat(0x15171a), -2.0, .97, z);
-const luzFreio = add(new THREE.BoxGeometry(.06, .07, 1.7), mat(0x550000, { emissive: 0x7a0000, emissiveIntensity: .6 }), -2.42, .72, 0);         // lanterna
+// Estilo da foto de referência do Mikael: tudo em LINHAS RETAS (facetado), cor de aço inox.
+pintura.color.setHex(0xb9c0c8); pintura.metalness = .85; pintura.roughness = .32;
+add(esticar(perfil([[-2.2, .3], [2.2, .3], [2.42, .38], [2.36, .58], [1.05, .8], [-.9, .93], [-2.36, .88], [-2.4, .45], [-2.2, .3]]), 1.72, .05), pintura, 0, 0, 0);
+add(esticar(perfil([[1.1, .8], [-.1, 1.2], [-1.75, .9], [1.1, .8]]), 1.36, .04), mat(0x0b0f14, { metalness: .6, roughness: .06 }), 0, 0, 0);    // vidros em triângulo
+add(esticar(perfil([[-2.2, .3], [2.2, .3], [2.3, .4], [-2.3, .4]]), 1.8, .02), mat(0x15171a, { roughness: .7 }), 0, 0, 0);                    // saia preta embaixo
+add(new THREE.BoxGeometry(.05, .035, 1.7), mat(0xffffff, { emissive: 0xe8f6ff, emissiveIntensity: 1.4 }), 2.37, .56, 0);                       // faixa de luz na frente
+for (const z of [-.92, .92]) add(new THREE.BoxGeometry(.18, .05, .03), mat(0xff8a1f, { emissive: 0xff7a00, emissiveIntensity: 1 }), 1.05, .7, z);   // pisca laranja
+const luzFreio = add(new THREE.BoxGeometry(.05, .05, 1.78), mat(0x550000, { emissive: 0x7a0000, emissiveIntensity: .8 }), -2.41, .8, 0);        // faixa vermelha atrás
 const rodas = [];
-for (const [x, z] of [[1.45, .98], [1.45, -.98], [-1.45, .98], [-1.45, -.98]]) {
-    const r = add(new THREE.CylinderGeometry(.4, .4, .3, 28), mat(0x15171a, { roughness: .9 }), x, .4, z);
+for (const [x, z] of [[1.5, .98], [1.5, -.98], [-1.5, .98], [-1.5, -.98]]) {
+    const r = add(new THREE.CylinderGeometry(.43, .43, .32, 28), mat(0x111214, { roughness: .9 }), x, .43, z);
     r.rotation.x = Math.PI / 2; rodas.push(r);
-    const aro = new THREE.Mesh(new THREE.CylinderGeometry(.26, .26, .32, 20), mat(0x3a3f46, { metalness: .8, roughness: .3 }));
-    for (let i = 0; i < 5; i++) { const raio = new THREE.Mesh(new THREE.BoxGeometry(.06, .34, .46), mat(0xd4d9de, { metalness: .9, roughness: .25 })); raio.rotation.y = i * Math.PI / 5 * 2; aro.add(raio); }
+    const aro = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .34, 24), mat(0x1c1f23, { metalness: .7, roughness: .35 }));
+    for (let i = 0; i < 5; i++) { const raio = new THREE.Mesh(new THREE.BoxGeometry(.035, .36, .56), mat(0x2b2f35, { metalness: .8, roughness: .3 })); raio.rotation.y = i * Math.PI / 5; aro.add(raio); }
     r.add(aro);
 }
 const chamas = [];
