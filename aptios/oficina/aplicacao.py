@@ -9,7 +9,7 @@ import secrets
 from dataclasses import asdict
 from typing import Any, Iterable, Mapping
 
-from aptios.oficina.batalha import Rival, calcular_atributos, lutar
+from aptios.oficina.batalha import MOVIMENTOS, Rival, calcular_atributos, lutar
 from aptios.oficina.dominio import (
     Catalogo, Explorador, Exploradores, PacoteDeTokens, Pagamentos, PecaColocada, RegraDaOficina,
 )
@@ -39,6 +39,7 @@ class Oficina:
                 for d in self.catalogo.desafios.values()
             ],
             "pacotes": [asdict(p) for p in self.pacotes.values()],
+            "golpes": {k: asdict(m) for k, m in MOVIMENTOS.items()},
         }
 
     def estado(self, codigo: str) -> dict[str, Any]:
