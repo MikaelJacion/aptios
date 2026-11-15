@@ -5,10 +5,17 @@ Rodar:  venv/bin/pytest
 import pytest
 from fastapi.testclient import TestClient
 
-from robotutor.aplicacao.perguntar import montar_conversa
-from robotutor.dominio.modelos import Conversa, Kit, Mensagem, MensagemInvalida
-from robotutor.infra.prompt import prompt_do_sistema
-from robotutor.interface.web import LimiteDePerguntas, criar_app
+from aptios.tutor.aplicacao import montar_conversa
+from aptios.tutor.dominio import Conversa, Kit, Mensagem, MensagemInvalida
+from aptios.tutor.prompt import prompt_do_sistema
+from aptios.interface.web import LimiteDePerguntas, criar_app
+from aptios.oficina.aplicacao import Oficina
+from aptios.oficina.catalogo import CATALOGO, PACOTES
+from aptios.oficina.infra import ExploradoresEmMemoria, PagamentoDesativado
+
+
+def nova_oficina():
+    return Oficina(CATALOGO, ExploradoresEmMemoria(), PagamentoDesativado(), PACOTES)
 
 
 class TutorFalso:
@@ -77,7 +84,7 @@ def test_historico_fora_de_ordem_e_recusado():
 
 def test_site_responde_em_pedacos_com_o_tutor():
     tutor = TutorFalso()
-    cliente = TestClient(criar_app(tutor))
+    cliente = TestClient(criar_app(tutor, nova_oficina()))
     r = cliente.post("/api/perguntar", json={
         "kit": "lego_spike",
         "pergunta": "Como andar para frente?",
@@ -90,13 +97,13 @@ def test_site_responde_em_pedacos_com_o_tutor():
 
 
 def test_site_recusa_pergunta_invalida():
-    cliente = TestClient(criar_app(TutorFalso()))
+    cliente = TestClient(criar_app(TutorFalso(), nova_oficina()))
     r = cliente.post("/api/perguntar", json={"kit": "scratch", "pergunta": ""})
     assert r.status_code == 400
 
 
 def test_limite_de_perguntas():
-    cliente = TestClient(criar_app(TutorFalso(), LimiteDePerguntas(maximo=2)))
+    cliente = TestClient(criar_app(TutorFalso(), nova_oficina(), LimiteDePerguntas(maximo=2)))
     pedido = {"kit": "scratch", "pergunta": "oi"}
     assert cliente.post("/api/perguntar", json=pedido).status_code == 200
     assert cliente.post("/api/perguntar", json=pedido).status_code == 200
@@ -104,5 +111,6 @@ def test_limite_de_perguntas():
 
 
 def test_pagina_inicial_abre():
-    r = TestClient(criar_app(TutorFalso())).get("/")
+    r = TestClient(criar_app(TutorFalso(), nova_oficina())).get("/")
     assert r.status_code == 200 and "RoboTutor" in r.text
+    assert "Oficina Aptios" in TestClient(criar_app(TutorFalso(), nova_oficina())).get("/oficina").text

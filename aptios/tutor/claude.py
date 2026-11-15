@@ -10,8 +10,8 @@ from typing import AsyncIterator
 
 import anthropic
 
-from robotutor.dominio.modelos import Conversa
-from robotutor.infra.prompt import prompt_do_sistema
+from aptios.tutor.dominio import Conversa
+from aptios.tutor.prompt import prompt_do_sistema
 
 log = logging.getLogger(__name__)
 

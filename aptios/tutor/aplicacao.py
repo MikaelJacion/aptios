@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import AsyncIterator, Iterable, Mapping
 
-from robotutor.dominio.modelos import Conversa, Kit, Mensagem, MensagemInvalida, Tutor
+from aptios.tutor.dominio import Conversa, Kit, Mensagem, MensagemInvalida, Tutor
 
 
 def montar_conversa(kit: str, historico: Iterable[Mapping[str, str]], pergunta: str) -> Conversa:
