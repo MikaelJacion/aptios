@@ -67,3 +67,13 @@ def test_garagem_faz_sentido():
     assert f["roadster"]["zero_a_cem_s"] < f["suv"]["zero_a_cem_s"] < f["hatch"]["zero_a_cem_s"]
     assert f["kart"]["zero_a_cem_s"] == 0 and f["onibus"]["zero_a_cem_s"] == 0   # nem chegam a 100 km/h!
     assert f["onibus"]["autonomia_km"] < f["roadster"]["autonomia_km"]           # ônibus é um caixote
+
+
+def test_flutuar_custa_caro_e_cresce_com_o_peso():
+    from aptios.pista.fisica import CARROS, potencia_para_flutuar_kw
+    p = potencia_para_flutuar_kw(ROADSTER)
+    assert p < ROADSTER.potencia_kw                      # o roadster consegue voar
+    dobro = potencia_para_flutuar_kw(replace(ROADSTER, massa_kg=4000))
+    assert abs(dobro / p - 2 ** 1.5) < 1e-9              # dobro do peso = 2,83× a potência
+    assert dobro > ROADSTER.potencia_kw                  # pesado demais: não decola
+    assert all(potencia_para_flutuar_kw(c) == float("inf") for c in CARROS if c.id != "roadster")

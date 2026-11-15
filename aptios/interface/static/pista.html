@@ -139,6 +139,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
             <div class="mostrador"><b id="m-tempo">0,00</b><span>segundos</span></div>
             <div class="mostrador"><b id="m-bat">100%</b><span>bateria</span><div class="tanque"><i id="t-bat" style="width:100%"></i></div></div>
             <div class="mostrador" id="mostrador-foguete" hidden><b id="m-fog">8,0 s</b><span>ar do foguete</span><div class="tanque foguete"><i id="t-fog" style="width:100%"></i></div></div>
+            <div class="mostrador" id="mostrador-alt" hidden><b id="m-alt">0</b><span>m de altura</span></div>
         </div>
         <canvas class="minimapa" id="minimapa" width="320" height="320" hidden aria-label="Mapa"></canvas>
         <div class="recado" id="recado"></div>
@@ -148,6 +149,9 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
             <button class="botao frear" id="b-frear">▼ Frear</button>
             <button class="botao virar" id="b-direita" hidden aria-label="Virar à direita">▶</button>
             <button class="botao" id="b-foguete" aria-pressed="false">🚀 Foguete (F)</button>
+            <button class="botao" id="b-voar" hidden aria-pressed="false">🛸 Voar (V)</button>
+            <button class="botao virar" id="b-subir" hidden>⏫ Subir (Q)</button>
+            <button class="botao virar" id="b-descer" hidden>⏬ Descer (E)</button>
             <button class="botao" id="b-recomecar">↺ Recomeçar (R)</button>
         </div>
     </section>
@@ -159,8 +163,13 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
         </section>
         <section id="sec-mundo" hidden>
             <h2>🌎 Mundo aberto</h2>
-            <p class="explica">Dirija pela cidade com <b>▲ ▼ ◀ ▶</b> (ou W A S D). Pegue os <b>⚡ raios de energia</b>, pule nas <b>rampas</b> e não bata nos prédios! Segure ▼ parado para dar ré.</p>
+            <p class="explica">Dirija pela cidade com <b>▲ ▼ ◀ ▶</b> (ou W A S D). Pegue os <b>⚡ raios de energia</b>, pule nas <b>rampas</b> e não bata nos prédios! Segure ▼ parado para dar ré. Com o Roadster, aperte <b>🛸 Voar</b> (V) e use Q / E para subir e descer.</p>
             <p style="margin:10px 0 0">⚡ Raios: <span class="contador" id="contador-raios">0 / 0</span></p>
+        </section>
+        <section id="sec-voo" hidden>
+            <h2>🛸 Voo</h2>
+            <p class="explica" id="texto-voo"></p>
+            <p class="nota" style="margin-top:6px">Para flutuar, os propulsores empurram ar para baixo com força igual ao peso. A potência é P = √(peso³ ÷ 2·ρ·A). O peso está AO CUBO: o dobro do peso precisa de 2,8× a potência! Teste no Laboratório: deixe o carro pesado e tente decolar.</p>
         </section>
         <section id="sec-curva" hidden>
             <h2>🛞 A curva e o pneu</h2>
@@ -238,6 +247,7 @@ function passo(c, e, dt, acelerador = 0, freio = 0, foguete = false) {
 }
 const estadoInicial = (c) => ({ t: 0, x: 0, v: 0, energia: c.bateria_kwh, fogueteRestante: c.foguete_s, f: forcas(c, 0, 0, 0, false, 0), a: 0 });
 const velocidadeMaxNaCurva = (c, raio) => Math.sqrt(c.aderencia * G * raio);   // v = √(μ·g·r)
+const potenciaParaFlutuar = (c) => c.area_voo_m2 > 0 ? Math.sqrt((c.massa_kg * G) ** 3 / (2 * DENSIDADE_AR * c.area_voo_m2)) / 1000 : Infinity;   // kW
 
 function fichaJS(c, foguete = false) {   // igual à ficha() do Python
     let e = estadoInicial(c), zeroACem = null, t400 = null, v400 = null;
@@ -361,7 +371,7 @@ function construirMundo() {
             const cx = x0 + (a + .5) * lote, cz = z0 + (b + .5) * lote;
             const p = new THREE.Mesh(cubo, materiais[Math.floor(sorte() * materiais.length)]);
             p.scale.set(w, h, d); p.position.set(cx, h / 2, cz); p.castShadow = p.receiveShadow = true; mundo.add(p);
-            predios.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
+            predios.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, h });
         }
     }
     const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(.35, .45, 3, 8), mat('#7a5a3a'), arvores.length);
@@ -369,7 +379,7 @@ function construirMundo() {
     arvores.forEach(([x, z, s], i) => {
         tronco.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 1.5 * s, z), q.identity(), new THREE.Vector3(s, s, s)));
         copa.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 4.2 * s, z), q.identity(), new THREE.Vector3(s, s, s)));
-        predios.push({ x0: x - .5, x1: x + .5, z0: z - .5, z1: z + .5 });   // bater numa árvore também para o carro
+        predios.push({ x0: x - .5, x1: x + .5, z0: z - .5, z1: z + .5, h: 6.5 * s });   // bater numa árvore também para o carro
     });
     tronco.castShadow = copa.castShadow = true; mundo.add(tronco, copa);
     // rampas (só sobem no sentido +x): um triângulo "esticado" para os lados
@@ -386,14 +396,21 @@ function construirMundo() {
         const k = -MUNDO + QUADRA * Math.floor(sorte() * 9), t = -MUNDO + 40 + sorte() * (2 * MUNDO - 80);
         const [x, z] = sorte() < .5 ? [t, k] : [k, t];
         const o = new THREE.Mesh(raioGeo, raioMat); o.position.set(x, 1.6, z); mundo.add(o);
-        raios.push({ obj: o, x, z, pego: false });
+        raios.push({ obj: o, x, y: 1.6, z, pego: false });
+    }
+    // raios do CÉU: só dá para pegar voando!
+    const ceuMat = new THREE.MeshStandardMaterial({ color: 0x5fd4ff, emissive: 0x1aa7ff, emissiveIntensity: .9 });
+    for (let n = 0; n < 10; n++) {
+        const x = -MUNDO + 60 + sorte() * (2 * MUNDO - 120), z = -MUNDO + 60 + sorte() * (2 * MUNDO - 120), y = 30 + sorte() * 60;
+        const o = new THREE.Mesh(raioGeo, ceuMat); o.scale.setScalar(1.8); o.position.set(x, y, z); mundo.add(o);
+        raios.push({ obj: o, x, y, z, pego: false });
     }
     criarTrafego(sorte);
     // borda do mundo
     const muroMat = mat('#8a8f98');
     for (const [x, z, w, d] of [[0, -MUNDO - 40, lado, 2], [0, MUNDO + 40, lado, 2], [-MUNDO - 40, 0, 2, lado], [MUNDO + 40, 0, 2, lado]]) {
         const m = new THREE.Mesh(cubo, muroMat); m.scale.set(w, 3, d); m.position.set(x, 1.5, z); mundo.add(m);
-        predios.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 });
+        predios.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, h: 3 });
     }
     // fundo do minimapa (desenhado uma vez só)
     mapaFundo = Object.assign(document.createElement('canvas'), { width: 320, height: 320 });
@@ -444,7 +461,7 @@ function alturaDoChao(x, z) {
     for (const r of rampas) if (x >= r.x && x <= r.x + r.L && Math.abs(z - r.z) <= r.W / 2) return (x - r.x) / r.L * r.H;
     return 0;
 }
-const bateu = (x, z, raio = 1.3) => predios.some(p => x > p.x0 - raio && x < p.x1 + raio && z > p.z0 - raio && z < p.z1 + raio);
+const bateu = (x, z, raio = 1.3, y = 0) => predios.some(p => y < p.h && x > p.x0 - raio && x < p.x1 + raio && z > p.z0 - raio && z < p.z1 + raio);
 
 // ───────── os carros: cada um é um PERFIL (desenho de lado) "esticado" para os lados ─────────
 function perfil(pontos) {
@@ -460,7 +477,7 @@ const ESTILOS = {
     roadster: { cor: 0xb9c0c8, metal: .85, rugosidade: .32, borda: .05, largura: 1.72,
         corpo: [[-2.2, .3], [2.2, .3], [2.42, .38], [2.36, .58], [1.05, .8], [-.9, .93], [-2.36, .88], [-2.4, .45]],
         vidro: [[1.1, .8], [-.1, 1.2], [-1.75, .9]], larguraVidro: 1.36, farolY: .56, lanternaY: .8,
-        roda: .43, eixos: [1.5, -1.5], bitola: .98, rodaEscura: true, foguete: true,
+        roda: .43, eixos: [1.5, -1.5], bitola: .98, rodaEscura: true, foguete: true, voo: true,
         extras: (add) => {
             add(esticar(perfil([[-2.2, .3], [2.2, .3], [2.3, .4], [-2.3, .4]]), 1.8, .02), PRETO);
             for (const z of [-.92, .92]) add(new THREE.BoxGeometry(.18, .05, .03), mat(0xff8a1f, { emissive: 0xff7a00, emissiveIntensity: 1 }), 1.05, .7, z);
@@ -525,7 +542,13 @@ function construirCarro(id, corPintura) {
         const ch = new THREE.Mesh(new THREE.ConeGeometry(.16, 1.2, 12), new THREE.MeshBasicMaterial({ color: 0xffa230, transparent: true, opacity: .85 }));
         ch.rotation.z = Math.PI / 2; ch.position.set(tras - .4, .62, z); ch.visible = false; grupo.add(ch); chamas.push(ch);
     }
-    return { grupo, formas, rodas, chamas, luzFreio, comprimento: frente - tras, largura: E.largura + 2 * borda, altura: Math.max(...ys) };
+    const jatos = [];
+    if (E.voo) for (const x of E.eixos) for (const lado of [-1, 1]) {   // propulsores de voo, embaixo do carro
+        const j = new THREE.Mesh(new THREE.ConeGeometry(.28, 1.4, 12), new THREE.MeshBasicMaterial({ color: 0x6fd6ff, transparent: true, opacity: .75 }));
+        j.position.set(x * .7, -.4, lado * E.bitola * .55); j.visible = false; grupo.add(j); jatos.push(j);
+        j.rotation.x = Math.PI;   // o cone fica de ponta para baixo, como um jato
+    }
+    return { grupo, formas, rodas, chamas, jatos, luzFreio, comprimento: frente - tras, largura: E.largura + 2 * borda, altura: Math.max(...ys) };
 }
 
 function colocarModelo(alvo, url, comprimento) {   // modelo do Meshy (.glb), se existir
@@ -555,7 +578,7 @@ function trocarVisual(id) {
 trocarVisual(escolhido.carro.id);
 
 // ═════════════════ ESTADO DA CORRIDA ═════════════════
-const comando = { acelerar: false, frear: false, foguete: false, esquerda: false, direita: false };
+const comando = { acelerar: false, frear: false, foguete: false, esquerda: false, direita: false, subir: false, descer: false };
 let modo = 'arrancada', e = estadoInicial(carro), correndo = false, marcas = {}, velMax = 0;
 // no mundo aberto: posição, direção (rumo), pulo e ré
 const pos = { x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity };
@@ -571,10 +594,10 @@ function dizer(texto, segundos = 1.6) { $('recado').textContent = texto; recadoA
 function recomecar() {
     e = estadoInicial(carro); correndo = false; marcas = {}; velMax = 0;
     if (rival) { rival.e = estadoInicial(rival.carro); rival.fim = false; }
-    Object.assign(pos, { x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity });
+    Object.assign(pos, { voo: false, x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity });
     if (modo === 'mundo') { pos.x = -MUNDO + QUADRA * 2; pos.z = 0; for (const r of raios) { r.pego = false; r.obj.visible = true; } pegos = 0; }
     dizer(modo === 'mundo' ? 'Explore a cidade! ⚡ Pegue os raios de energia.' : 'Segure ▲ ou o botão verde para acelerar!', 0);
-    desenharResultados(); atualizarContador();
+    desenharResultados(); atualizarContador(); atualizarBotoesVoo();
 }
 const atualizarContador = () => { $('contador-raios').textContent = `${pegos} / ${raios.length}`; };
 
@@ -612,6 +635,7 @@ function avancar(segundos) {
 }
 
 function andarNoMundo(ds, dt) {
+    if (pos.voo) return voar(ds, dt);
     // ré: segurando ▼ com o carro parado, ele anda para trás devagar
     pos.re = comando.frear && !comando.acelerar && e.v < .3 && !pos.voando ? Math.min(pos.re + 4 * dt, 5) : Math.max(pos.re - 8 * dt, 0);
     ds -= pos.re * dt;
@@ -639,7 +663,7 @@ function andarNoMundo(ds, dt) {
     // pulo: na rampa o carro sobe; quando a rampa acaba, ele voa e a gravidade puxa de volta
     const chao = alturaDoChao(nx, nz);
     if (!pos.voando && chao - pos.y > .8) return batida();      // bateu na parede de trás da rampa
-    if (bateu(nx, nz, Math.max(1.3, meu.largura / 2 + .3)) && pos.y < 6) return batida();
+    if (bateu(nx, nz, Math.max(1.3, meu.largura / 2 + .3), pos.y)) return batida();
     const carroBatido = pos.y < 2.5 && trafego.find(c => encostou(c, nx, nz));
     if (carroBatido) { carroBatido.v = 0; return batida(); }
     pos.x = nx; pos.z = nz;
@@ -650,12 +674,57 @@ function andarNoMundo(ds, dt) {
         pos.voando = true; pos.vy = e.v * Math.sin(Math.atan(3.2 / 16));
         dizer(`🛫 Voou a ${num(e.v * 3.6)} km/h!`);
     } else pos.y = chao;
-    // raios de energia
-    for (const r of raios) if (!r.pego && Math.hypot(r.x - pos.x, r.z - pos.z) < 3.2 && pos.y < 4) {
+    coletarRaios();
+}
+function coletarRaios() {
+    for (const r of raios) if (!r.pego && Math.hypot(r.x - pos.x, r.z - pos.z) < 3.5 && Math.abs(r.y - pos.y - .6) < 3.5) {
         r.pego = true; r.obj.visible = false; pegos++;
         e = { ...e, energia: Math.min(carro.bateria_kwh, e.energia + carro.bateria_kwh * .05) };
         dizer(pegos === raios.length ? '🏆 Você pegou TODOS os raios!' : '⚡ +5% de bateria!'); atualizarContador();
     }
+}
+
+// ───────── MODO VOO: propulsores empurram ar para baixo ─────────
+function voar(ds, dt) {
+    const alvo = (comando.esquerda ? 1 : 0) - (comando.direita ? 1 : 0);
+    pos.volante += Math.max(-4 * dt, Math.min(4 * dt, alvo - pos.volante));
+    pos.rumo += pos.volante * .9 * dt;                                 // no ar não tem pneu: vira sem derrapar
+    const sobe = (comando.subir ? 1 : 0) - (comando.descer ? 1 : 0);
+    pos.vy += sobe * .6 * G * dt - pos.vy * 1.2 * dt;                  // força extra para subir/descer, e o ar "freia"
+    const nx = pos.x + Math.cos(pos.rumo) * ds, nz = pos.z - Math.sin(pos.rumo) * ds, ny = Math.min(180, pos.y + pos.vy * dt);
+    const chao = alturaDoChao(nx, nz);
+    if (bateu(nx, nz, Math.max(1.3, meu.largura / 2 + .3), ny)) return batida();
+    pos.x = nx; pos.z = nz; pos.y = Math.max(chao, ny);
+    if (pos.y === chao && pos.vy < 0) pos.vy = 0;
+    // ficar no ar gasta MUITA energia (kW × horas = kWh)
+    e = { ...e, energia: Math.max(0, e.energia - potenciaParaFlutuar(carro) * dt / 3600) };
+    if (e.energia <= 0) desligarVoo('🔋 Acabou a bateria no ar!');
+    else if (potenciaParaFlutuar(carro) > carro.potencia_kw) desligarVoo('😓 Ficou pesado demais para voar!');
+    pos.aderenciaUsada = 0; pos.derrapando = false; pos.raioCurva = Infinity;
+    coletarRaios();
+}
+function alternarVoo() {
+    if (modo !== 'mundo') return;
+    if (!carro.area_voo_m2) { dizer('Só o Roadster voa!'); return; }
+    if (pos.voo) return desligarVoo('🪂 Propulsores desligados!');
+    const precisa = potenciaParaFlutuar(carro);
+    if (precisa > carro.potencia_kw) { dizer(`😓 Pesado demais! Para flutuar precisa de ${num(precisa)} kW, e o motor só tem ${num(carro.potencia_kw)} kW.`, 3.5); return; }
+    pos.voo = true; pos.voando = false; pos.re = 0; pos.vy = 5;
+    dizer('🛸 Decolando! Use ⏫ e ⏬ para subir e descer.', 2.5);
+    atualizarBotoesVoo();
+}
+function desligarVoo(msg) {
+    pos.voo = false;
+    if (pos.y > alturaDoChao(pos.x, pos.z) + .1) pos.voando = true;   // sem propulsor, a gravidade puxa
+    dizer(msg); atualizarBotoesVoo();
+}
+function atualizarBotoesVoo() {
+    const noMundo = modo === 'mundo';
+    $('b-voar').hidden = !noMundo; $('b-voar').disabled = !carro.area_voo_m2;
+    $('b-voar').title = carro.area_voo_m2 ? '' : 'Só o Roadster voa';
+    $('b-voar').setAttribute('aria-pressed', !!pos.voo);
+    for (const id of ['b-subir', 'b-descer', 'mostrador-alt']) $(id).hidden = !(noMundo && pos.voo);
+    $('sec-voo').hidden = !(noMundo && carro.area_voo_m2);
 }
 function batida() {
     const kmh = Math.abs(e.v - pos.re) * 3.6;
@@ -684,6 +753,13 @@ function desenharForcas() {
         : e.v * 3.6 >= carro.limite_kmh - .5 && !comando.frear ? `🚧 Limitador em ${num(carro.limite_kmh)} km/h: o motor só empurra o suficiente para vencer o ar.`
         : empurra > segura ? `Empurra (${num(empurra)} N) mais do que segura (${num(segura)} N): o carro ACELERA.`
         : `Segura (${num(segura)} N) mais do que empurra (${num(empurra)} N): o carro PERDE velocidade.`;
+    if (modo === 'mundo' && carro.area_voo_m2) {
+        const kw = potenciaParaFlutuar(carro), minutos = e.energia / kw * 60;
+        $('texto-voo').textContent = kw > carro.potencia_kw
+            ? `😓 Com ${num(carro.massa_kg)} kg, o carro precisa de ${num(kw)} kW só para flutuar, mas o motor tem ${num(carro.potencia_kw)} kW. Não decola! Deixe ele mais leve no Laboratório.`
+            : pos.voo ? `Voando a ${num(pos.y - alturaDoChao(pos.x, pos.z))} m de altura. Só para não cair, os propulsores gastam ${num(kw)} kW. Com a bateria que sobrou, dá para ficar uns ${num(minutos)} minutos no ar.`
+            : `Para flutuar, este carro precisa de ${num(kw)} kW (o motor tem ${num(carro.potencia_kw)} kW). Aperte 🛸 Voar ou a tecla V! Lá no céu tem ⚡ raios azuis que só dá para pegar voando.`;
+    }
     if (modo === 'mundo') {
         const u = Math.min(pos.aderenciaUsada, 1.5);
         $('barra-aderencia').style.width = Math.min(100, u * 100) + '%';
@@ -794,6 +870,7 @@ function trocarModo(novo) {
     $('modo-arrancada').setAttribute('aria-pressed', !noMundo); $('modo-mundo').setAttribute('aria-pressed', noMundo);
     for (const id of ['sec-mundo', 'sec-curva', 'b-esquerda', 'b-direita', 'minimapa']) $(id).hidden = !noMundo;
     $('sec-arrancada').hidden = noMundo;
+    atualizarBotoesVoo();
     veiculo.rotation.set(0, 0, 0);
     recomecar();
 }
@@ -806,6 +883,8 @@ function segurar(botao, chave) {
     botao.addEventListener('pointerdown', (ev) => { ev.preventDefault(); botao.setPointerCapture(ev.pointerId); comando[chave] = true; botao.classList.add('apertado'); });
     botao.addEventListener('pointerup', soltar); botao.addEventListener('pointercancel', soltar); botao.addEventListener('lostpointercapture', soltar);
 }
+segurar($('b-subir'), 'subir'); segurar($('b-descer'), 'descer');
+$('b-voar').onclick = alternarVoo;
 segurar($('b-acelerar'), 'acelerar'); segurar($('b-frear'), 'frear'); segurar($('b-esquerda'), 'esquerda'); segurar($('b-direita'), 'direita');
 function alternarFoguete() {
     if (modo === 'arrancada' && correndo) { dizer('🚀 Na arrancada, ligue o foguete antes da largada!'); return; }
@@ -816,15 +895,16 @@ function alternarFoguete() {
 }
 $('b-foguete').onclick = alternarFoguete;
 $('b-recomecar').onclick = recomecar;
-const TECLAS = { ArrowUp: 'acelerar', KeyW: 'acelerar', ArrowDown: 'frear', KeyS: 'frear', Space: 'frear', ArrowLeft: 'esquerda', KeyA: 'esquerda', ArrowRight: 'direita', KeyD: 'direita' };
+const TECLAS = { ArrowUp: 'acelerar', KeyW: 'acelerar', ArrowDown: 'frear', KeyS: 'frear', Space: 'frear', ArrowLeft: 'esquerda', KeyA: 'esquerda', ArrowRight: 'direita', KeyD: 'direita', KeyQ: 'subir', KeyE: 'descer' };
 addEventListener('keydown', (ev) => {
     if (ev.target.tagName === 'INPUT') return;
     if (TECLAS[ev.code]) { comando[TECLAS[ev.code]] = true; ev.preventDefault(); }
     else if (ev.code === 'KeyF' && !ev.repeat) alternarFoguete();
     else if (ev.code === 'KeyR' && !ev.repeat) recomecar();
+    else if (ev.code === 'KeyV' && !ev.repeat) alternarVoo();
 });
 addEventListener('keyup', (ev) => { if (TECLAS[ev.code]) comando[TECLAS[ev.code]] = false; });
-addEventListener('blur', () => { for (const k of ['acelerar', 'frear', 'esquerda', 'direita']) comando[k] = false; });
+addEventListener('blur', () => { for (const k of ['acelerar', 'frear', 'esquerda', 'direita', 'subir', 'descer']) comando[k] = false; });
 
 // ═════════════════ DESENHAR ═════════════════
 const m4 = new THREE.Matrix4(), olhoSuave = new THREE.Vector3(), alvoCam = new THREE.Vector3();
@@ -859,12 +939,14 @@ function desenhar(dt) {
     } else {
         veiculo.position.set(pos.x, pos.y, pos.z);
         veiculo.rotation.y = pos.rumo;
-        veiculo.rotation.z = pos.voando ? Math.max(-.25, Math.min(.25, pos.vy * .02)) : alturaDoChao(pos.x, pos.z) > 0 ? Math.atan(3.2 / 16) : 0;
-        veiculo.rotation.x = pos.derrapando ? Math.sign(pos.volante) * -.05 : 0;
-        for (const r of raios) if (!r.pego) { r.obj.rotation.y += dt * 2; r.obj.position.y = 1.6 + Math.sin(performance.now() / 300 + r.x) * .3; }
+        veiculo.rotation.z = pos.voando || pos.voo ? Math.max(-.25, Math.min(.25, pos.vy * .02)) : alturaDoChao(pos.x, pos.z) > 0 ? Math.atan(3.2 / 16) : 0;
+        veiculo.rotation.x = pos.voo ? -pos.volante * .25 : pos.derrapando ? Math.sign(pos.volante) * -.05 : 0;
+        if (pos.voo) $('m-alt').textContent = num(pos.y - alturaDoChao(pos.x, pos.z));
+        for (const r of raios) if (!r.pego) { r.obj.rotation.y += dt * 2; r.obj.position.y = r.y + Math.sin(performance.now() / 300 + r.x) * .3; }
+        for (const j of meu.jatos) { j.visible = pos.voo; j.scale.set(1, .8 + Math.random() * .5, 1); }
         // câmera atrás do carro, chegando "macia" na posição
         const dir = new THREE.Vector3(Math.cos(pos.rumo), 0, -Math.sin(pos.rumo));
-        alvoCam.set(pos.x, pos.y, pos.z).addScaledVector(dir, -atras - 1 - Math.min(vel / 60, 4)).setY(pos.y + alto + .8);
+        alvoCam.set(pos.x, pos.y, pos.z).addScaledVector(dir, -atras - 1 - Math.min(vel / 60, 4)).setY(pos.y + alto + .8 + (pos.voo ? 3 : 0));
         moverTrafego(dt);
         olhoSuave.lerp(alvoCam, 1 - Math.exp(-dt * 6));
         if (olhoSuave.distanceTo(alvoCam) > 40) olhoSuave.copy(alvoCam);

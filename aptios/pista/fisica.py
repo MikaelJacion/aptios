@@ -38,6 +38,7 @@ class CarroEletrico:
     limite_kmh: float      # limitador eletrônico de velocidade
     foguete_n: float = 0   # empurrão extra dos propulsores (N)
     foguete_s: float = 0   # quantos segundos o ar comprimido dura
+    area_voo_m2: float = 0  # área dos propulsores que empurram o ar para baixo (0 = não voa)
 
 
 @dataclass(frozen=True)
@@ -120,7 +121,7 @@ def ficha(carro: CarroEletrico, foguete: bool = False) -> dict[str, float]:
 ROADSTER = CarroEletrico(
     id="roadster", nome="Roadster Elétrico", massa_kg=2000, potencia_kw=950, aderencia=1.4,
     arrasto_cda=0.45, rolamento=0.012, bateria_kwh=200, limite_kmh=400,
-    foguete_n=20000, foguete_s=8,
+    foguete_n=20000, foguete_s=8, area_voo_m2=8,
 )
 
 
@@ -151,3 +152,16 @@ def velocidade_max_na_curva(carro: CarroEletrico, raio_m: float) -> float:
     (repare que a massa some da conta!)
     """
     return (carro.aderencia * G * raio_m) ** 0.5
+
+
+def potencia_para_flutuar_kw(carro: CarroEletrico) -> float:
+    """Quanta potência (kW) o carro gasta só para ficar parado no ar.
+
+    Para flutuar, os propulsores empurram ar para baixo com força igual ao peso.
+    A física dos helicópteros diz que a potência é  P = √( peso³ ÷ (2·ρ·A) ).
+    Repare no PESO AO CUBO dentro da raiz: o dobro do peso precisa de 2,8× a potência!
+    """
+    if carro.area_voo_m2 <= 0:
+        return float("inf")
+    peso = carro.massa_kg * G
+    return (peso ** 3 / (2 * DENSIDADE_AR * carro.area_voo_m2)) ** 0.5 / 1000
