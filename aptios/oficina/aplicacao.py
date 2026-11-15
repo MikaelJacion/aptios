@@ -1,0 +1,99 @@
+"""APLICAÇÃO DA OFICINA — os casos de uso, um método para cada ação da criança.
+
+Repare no padrão de todos: 1) buscar o explorador, 2) pedir para o
+DOMÍNIO aplicar a regra, 3) salvar. A regra mora no domínio, nunca aqui.
+"""
+from __future__ import annotations
+
+import secrets
+from dataclasses import asdict
+from typing import Any, Iterable, Mapping
+
+from aptios.oficina.dominio import (
+    Catalogo, Explorador, Exploradores, PacoteDeTokens, Pagamentos, PecaColocada, RegraDaOficina,
+)
+
+
+class ExploradorNaoEncontrado(LookupError):
+    pass
+
+
+class Oficina:
+    def __init__(self, catalogo: Catalogo, exploradores: Exploradores,
+                 pagamentos: Pagamentos, pacotes: Iterable[PacoteDeTokens]) -> None:
+        self.catalogo = catalogo
+        self.exploradores = exploradores
+        self.pagamentos = pagamentos
+        self.pacotes = {p.id: p for p in pacotes}
+
+    # ── consultas ───────────────────────────────────────────────
+    def catalogo_publico(self) -> dict[str, Any]:
+        """O que o site pode mostrar. As respostas certas NÃO vão junto!"""
+        return {
+            "pecas": [asdict(p) for p in self.catalogo.pecas.values()],
+            "desafios": [
+                {k: v for k, v in asdict(d).items() if k not in ("correta", "explicacao")}
+                for d in self.catalogo.desafios.values()
+            ],
+            "pacotes": [asdict(p) for p in self.pacotes.values()],
+        }
+
+    def estado(self, codigo: str) -> dict[str, Any]:
+        return self._publico(self._buscar(codigo))
+
+    # ── ações ───────────────────────────────────────────────────
+    def novo_explorador(self) -> dict[str, Any]:
+        explorador = Explorador(codigo=secrets.token_urlsafe(18))
+        explorador.receber_presentes(self.catalogo)
+        self.exploradores.salvar(explorador)
+        return {"codigo": explorador.codigo, **self._publico(explorador)}
+
+    def resolver_desafio(self, codigo: str, desafio_id: str, resposta: int) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        desafio = self.catalogo.desafio(desafio_id)
+        acertou = explorador.resolver_desafio(desafio, resposta)
+        self.exploradores.salvar(explorador)
+        return {
+            "acertou": acertou,
+            "explicacao": desafio.explicacao if acertou else "Quase! Pense mais um pouquinho e tente de novo.",
+            **self._publico(explorador),
+        }
+
+    def comprar_peca(self, codigo: str, peca_id: str) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        explorador.comprar(self.catalogo.peca(peca_id))
+        self.exploradores.salvar(explorador)
+        return self._publico(explorador)
+
+    def salvar_robo(self, codigo: str, pecas: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+        explorador = self._buscar(codigo)
+        robo = []
+        for p in pecas:
+            self.catalogo.peca(str(p["peca_id"]))  # a peça precisa existir
+            robo.append(PecaColocada(str(p["peca_id"]), int(p["x"]), int(p["y"]), int(p["z"]), int(p["giro"])))
+        explorador.montar(robo)
+        self.exploradores.salvar(explorador)
+        return self._publico(explorador)
+
+    def comprar_tokens(self, codigo: str, pacote_id: str) -> dict[str, str]:
+        explorador = self._buscar(codigo)
+        pacote = self.pacotes.get(pacote_id)
+        if not pacote:
+            raise RegraDaOficina("pacote desconhecido")
+        return {"link_pagamento": self.pagamentos.iniciar(explorador, pacote)}
+
+    # ── ajudantes ───────────────────────────────────────────────
+    def _buscar(self, codigo: str) -> Explorador:
+        explorador = self.exploradores.buscar(codigo) if codigo else None
+        if explorador is None:
+            raise ExploradorNaoEncontrado("explorador não encontrado")
+        return explorador
+
+    @staticmethod
+    def _publico(e: Explorador) -> dict[str, Any]:
+        return {
+            "saldo": e.saldo,
+            "pecas": sorted(e.pecas),
+            "desafios_feitos": sorted(e.desafios_feitos),
+            "robo": [asdict(c) for c in e.robo],
+        }
