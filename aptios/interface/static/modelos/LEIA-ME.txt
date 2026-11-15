@@ -1,0 +1,3 @@
+Coloque aqui os modelos 3D feitos no Meshy, exportados em .glb.
+O nome do arquivo precisa ser o id da peça, por exemplo: motor.glb, roda_grande.glb.
+A lista de ids está em aptios/oficina/catalogo.py.
