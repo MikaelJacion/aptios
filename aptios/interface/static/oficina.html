@@ -75,6 +75,8 @@ body {
     border-radius: 10px; padding: 7px 12px; cursor: pointer;
 }
 .ferr[aria-pressed="true"] { background: var(--azul); color: var(--azul-tinta); border-color: var(--azul); }
+.ferr.ligar { background: var(--amarelo); color: var(--amarelo-tinta); border-color: var(--amarelo); font-weight: 700; }
+.ferr:disabled { opacity: .45; cursor: default; }
 .status { font-size: .85rem; color: var(--suave); background: var(--painel); border-radius: 8px; padding: 4px 10px; border: 1px solid var(--linha); }
 .dica {
     position: absolute; left: 12px; bottom: 12px; right: 12px; pointer-events: none;
@@ -157,6 +159,7 @@ body {
             <button class="ferr" id="modo-apagar" aria-pressed="false">🧽 Tirar</button>
             <button class="ferr" id="girar">↻ Girar (R)</button>
             <button class="ferr" id="limpar">🗑 Limpar tudo</button>
+            <button class="ferr ligar" id="ligar">▶ Ligar robô</button>
             <span class="status" id="status">Carregando…</span>
         </div>
         <p class="dica">Clique para colocar a peça. Arraste para girar a câmera e use a rodinha ou dois dedos para o zoom.</p>
@@ -457,6 +460,7 @@ function destacar(item) {
     item?.obj.traverse(o => { if (o.isMesh && o.material.emissive) { o.userData.brilho ??= o.material.emissive.getHex(); o.material.emissive.setHex(0x661111); } });
 }
 function atualizarMira(ev) {
+    if (sim) return;   // com o robô ligado, a bancada fica travada
     alvo = calcularAlvo(mirar(ev));
     destacar(modo === 'apagar' ? alvo?.item ?? null : null);
     if (modo === 'apagar') { fantasma.visible = false; return; }
@@ -470,7 +474,7 @@ renderer.domElement.addEventListener('pointermove', atualizarMira);
 renderer.domElement.addEventListener('pointerleave', () => { if (fantasma) fantasma.visible = false; });
 renderer.domElement.addEventListener('pointerdown', ev => inicio = [ev.clientX, ev.clientY]);
 renderer.domElement.addEventListener('pointerup', ev => {
-    if (!inicio || Math.hypot(ev.clientX - inicio[0], ev.clientY - inicio[1]) > 6) return;
+    if (sim || !inicio || Math.hypot(ev.clientX - inicio[0], ev.clientY - inicio[1]) > 6) return;
     atualizarMira(ev);
     if (!alvo) return;
     if (modo === 'apagar') { tirar(alvo.item); salvarDepois(); }
@@ -490,12 +494,14 @@ $('modo-colocar').onclick = () => escolherModo('colocar');
 $('modo-apagar').onclick = () => escolherModo('apagar');
 $('girar').onclick = girar;
 $('limpar').onclick = () => {
+    if (sim) parar();
     if ($('limpar').dataset.confirmar) { [...robo].forEach(tirar); salvarDepois(); delete $('limpar').dataset.confirmar; $('limpar').textContent = '🗑 Limpar tudo'; return; }
     $('limpar').dataset.confirmar = '1'; $('limpar').textContent = '🗑 Tem certeza?';
     setTimeout(() => { delete $('limpar').dataset.confirmar; $('limpar').textContent = '🗑 Limpar tudo'; }, 3000);
 };
 addEventListener('keydown', ev => {
     if (ev.target.closest('input, textarea')) return;
+    if (sim) return;
     if (ev.key === 'r' || ev.key === 'R') girar();
     if (ev.key === 'Delete' || ev.key === 'Backspace') escolherModo(modo === 'apagar' ? 'colocar' : 'apagar');
 });
@@ -512,6 +518,102 @@ function salvarDepois() {
     }, 800);
 }
 
+// ═════════════════ SIMULAÇÃO: o robô ganha vida ═════════════════
+// Regras da simulação (o que cada peça faz de verdade num robô):
+//  • controlador = cérebro: sem ele, nada acontece;
+//  • rodas (2+) ou esteira: sem elas, não sai do lugar;
+//  • cada motor: mais velocidade (sem motor, só os motorzinhos fracos do controlador);
+//  • sensor de distância: enxerga a borda e desvia. Sem ele, o robô bate!
+//  • LEDs piscam enquanto o robô está ligado.
+const EIXO_Y = new THREE.Vector3(0, 1, 0);
+const relogio = new THREE.Clock();
+let sim = null;
+
+function diagnosticar() {
+    const pecas = robo.map(i => porId()[i.peca_id]);
+    const conta = (teste) => pecas.filter(teste).length;
+    if (!conta(p => p.categoria === 'controlador')) return 'Seu robô precisa de um 🧠 controlador para pensar!';
+    if (conta(p => p.categoria === 'roda' && p.id !== 'esteira') < 2 && !conta(p => p.id === 'esteira'))
+        return 'Coloque pelo menos 2 rodas (ou 1 esteira) para ele andar!';
+    return null;
+}
+
+function ligar() {
+    const problema = diagnosticar();
+    if (problema) { avisar('🔧 ' + problema); return; }
+    destacar(null); if (fantasma) fantasma.visible = false;
+
+    // Junta todas as peças num "veículo" só, que se move inteiro.
+    const caixa = new THREE.Box3(); robo.forEach(i => caixa.expandByObject(i.obj));
+    const centro = caixa.getCenter(new THREE.Vector3()), tam = caixa.getSize(new THREE.Vector3());
+    const veiculo = new THREE.Group(); veiculo.position.set(centro.x, 0, centro.z); cena.add(veiculo);
+    robo.forEach(i => veiculo.attach(i.obj));
+
+    // Para onde é a frente? As rodas rolam de lado ao eixo delas.
+    const pega = (f) => robo.filter(i => f(porId()[i.peca_id]));
+    const rodas = pega(p => p.categoria === 'roda');
+    const sensor = pega(p => p.id === 'sensor_distancia')[0];
+    const frente = rodas[0].giro % 180 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    if (sensor && new THREE.Vector3(0, 0, 1).applyAxisAngle(EIXO_Y, -sensor.giro * Math.PI / 180).dot(frente) < 0) frente.negate();
+
+    const motores = pega(p => p.categoria === 'motor' && p.id !== 'garra').length;
+    let feixe = null;
+    if (sensor) {   // o "olhar" do sensor: verde = livre, vermelho = perigo
+        feixe = new THREE.Mesh(new THREE.BoxGeometry(.12, .12, 2.5), new THREE.MeshBasicMaterial({ color: 0x22cc66, transparent: true, opacity: .55 }));
+        veiculo.add(feixe);
+    }
+    sim = {
+        veiculo, frente, feixe, batido: false, tempo: 0,
+        raio: Math.max(tam.x, tam.z) / 2,
+        velocidade: 1.6 + 1.6 * Math.min(motores, 3),
+        rodas: rodas.filter(i => i.peca_id !== 'esteira').map(i => i.obj.children[0]),
+        leds: pega(p => p.id === 'led' || p.id === 'antena').flatMap(i => { const m = []; i.obj.traverse(o => o.isMesh && o.material.emissiveIntensity > 0 && m.push(o.material)); return m; }),
+    };
+    if (feixe) feixe.position.copy(frente.clone().multiplyScalar(sim.raio + 1.25)).setY(.6);
+    $('ligar').textContent = '⏹ Parar';
+    ['modo-colocar', 'modo-apagar', 'girar'].forEach(id => $(id).disabled = true);
+    avisar(motores ? `🚗 Vrumm! ${motores} motor${motores > 1 ? 'es' : ''} ligado${motores > 1 ? 's' : ''}.`
+                   : '🐢 Andando devagar… Um ⚙ motor da Loja deixa o robô mais rápido!');
+    relogio.getDelta();
+}
+
+function parar() {
+    for (const item of robo) {
+        cena.add(item.obj);
+        posicionar(item.obj, porId()[item.peca_id], item.x, item.y, item.z, item.giro);
+    }
+    sim.rodas.forEach(r => r.rotation.x = 0);
+    sim.leds.forEach(m => m.emissiveIntensity = .5);
+    cena.remove(sim.veiculo);
+    sim = null;
+    $('ligar').textContent = '▶ Ligar robô';
+    ['modo-colocar', 'modo-apagar', 'girar'].forEach(id => $(id).disabled = false);
+    controles.target.set(0, 1, 0);
+}
+
+function passoDaSimulacao(dt) {
+    sim.tempo += dt;
+    sim.leds.forEach(m => m.emissiveIntensity = Math.sin(sim.tempo * 8) > 0 ? 1.4 : .1);
+    if (sim.batido) return;
+    const v = sim.veiculo, dir = sim.frente.clone().applyAxisAngle(EIXO_Y, v.rotation.y), lim = TAM / 2 - .1;
+    const saiDaBancada = (dist) => { const p = v.position.clone().addScaledVector(dir, dist); return Math.abs(p.x) > lim || Math.abs(p.z) > lim; };
+    let vel = sim.velocidade;
+    if (sim.feixe) {
+        const perigo = saiDaBancada(sim.raio + 2.5);
+        sim.feixe.material.color.setHex(perigo ? 0xff3344 : 0x22cc66);
+        if (perigo) { v.rotation.y += 2.4 * dt; vel *= .25; }   // viu a borda: vira devagar
+    } else if (saiDaBancada(sim.raio)) {
+        sim.batido = true;
+        avisar('💥 Bateu na borda! Coloque um 📡 sensor de distância para ele desviar sozinho.');
+        return;
+    }
+    v.position.addScaledVector(dir, vel * dt);
+    sim.rodas.forEach(r => r.rotation.x += vel * dt / .9);
+    controles.target.lerp(new THREE.Vector3(v.position.x, 1, v.position.z), .05);
+}
+
+$('ligar').onclick = () => sim ? parar() : ligar();
+
 function redimensionar() {
     const { clientWidth: w, clientHeight: h } = bancada;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -521,7 +623,11 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     const c = getComputedStyle(document.documentElement);
     cena.background.set(c.getPropertyValue('--cena').trim()); base.material.color.set(c.getPropertyValue('--base').trim());
 });
-renderer.setAnimationLoop(() => { controles.update(); renderer.render(cena, camera); });
+renderer.setAnimationLoop(() => {
+    const dt = Math.min(relogio.getDelta(), .05);
+    if (sim) passoDaSimulacao(dt);
+    controles.update(); renderer.render(cena, camera);
+});
 
 // ═════════════════════════ PAINEL ═════════════════════════
 const TRILHAS = { scratch: 'Scratch', lego_spike: 'LEGO SPIKE', lego_ev3: 'LEGO EV3', arduino: 'Arduino', robotica: 'Robótica' };
