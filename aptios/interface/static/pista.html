@@ -88,6 +88,16 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
 .nota { font-size: .78rem; color: var(--suave); margin: 0; }
 .contador { font: 700 1.6rem var(--fonte-titulo); font-variant-numeric: tabular-nums; }
 [hidden] { display: none !important; }
+.garagem { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.carro-btn { text-align: left; border: 1px solid var(--linha); background: var(--fundo); color: var(--tinta); border-radius: 12px; padding: 8px 10px; cursor: pointer; font: inherit; display: grid; gap: 2px; }
+.carro-btn strong { font: 600 .92rem var(--fonte-titulo); }
+.carro-btn span { font-size: .76rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.carro-btn[aria-pressed="true"] { border-color: var(--azul); box-shadow: 0 0 0 2px var(--azul) inset; }
+.carro-btn:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 600 .82rem var(--fonte-titulo); border: 1px solid var(--linha); background: var(--fundo); color: var(--tinta); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--tinta); color: var(--painel); border-color: var(--tinta); }
+.botao:disabled { opacity: .45; cursor: not-allowed; }
 @media (max-width: 860px) {
     .pista { grid-template-columns: 1fr; }
     .cena { height: 64vh; }
@@ -143,6 +153,10 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
     </section>
 
     <aside class="painel">
+        <section>
+            <h2>🚗 Garagem</h2>
+            <div class="garagem" id="garagem"></div>
+        </section>
         <section id="sec-mundo" hidden>
             <h2>🌎 Mundo aberto</h2>
             <p class="explica">Dirija pela cidade com <b>▲ ▼ ◀ ▶</b> (ou W A S D). Pegue os <b>⚡ raios de energia</b>, pule nas <b>rampas</b> e não bata nos prédios! Segure ▼ parado para dar ré.</p>
@@ -160,7 +174,10 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
             <p class="explica" id="quem-ganha">Parado, nenhuma força está agindo.</p>
         </section>
         <section id="sec-arrancada">
-            <h2>⏱ Sua arrancada</h2>
+            <h2>⚔️ Racha</h2>
+            <p class="explica" style="margin-bottom:8px">Escolha um carro para correr ao seu lado. Quem passar primeiro pelos 400 m vence!</p>
+            <div class="chips" id="rivais"></div>
+            <h2 style="margin-top:16px">⏱ Sua arrancada</h2>
             <table class="quadro">
                 <thead><tr><th></th><th>Você</th><th>Ficha</th></tr></thead>
                 <tbody id="resultados"></tbody>
@@ -176,7 +193,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.45
         <section>
             <h2>🏎 Sobre o carro</h2>
             <p class="explica" id="sobre"></p>
-            <p class="nota" style="margin-top:6px">Os números são aproximados das promessas anunciadas para o novo roadster elétrico. O carro de verdade ainda pode mudar, e o modo foguete é uma ideia anunciada, não confirmada.</p>
+            <p class="nota" style="margin-top:6px" id="nota-carro"></p>
         </section>
     </aside>
 </main>
@@ -240,8 +257,9 @@ let dados;
 try { dados = window.APTIOS_PISTA || await (await fetch('/api/pista/carro')).json(); }
 catch { $('recado').textContent = '⚠️ Não consegui falar com o servidor.'; throw new Error('sem dados'); }
 if (demo) { $('selo-demo').hidden = false; $('link-oficina').hidden = $('link-tutor').hidden = true; }
-const ORIGINAL = dados.carro;
-let carro = { ...ORIGINAL }, fichaAtual = { normal: dados.ficha, foguete: dados.ficha_foguete };
+const porId = Object.fromEntries(dados.carros.map(c => [c.carro.id, c]));
+let escolhido = dados.carros[0], ORIGINAL = escolhido.carro;
+let carro = { ...ORIGINAL }, fichaAtual = { normal: escolhido.ficha, foguete: escolhido.ficha_foguete || escolhido.ficha };
 
 // ═════════════════ CENA 3D ═════════════════
 const css = getComputedStyle(document.documentElement), cor = (n) => css.getPropertyValue(n).trim();
@@ -370,6 +388,7 @@ function construirMundo() {
         const o = new THREE.Mesh(raioGeo, raioMat); o.position.set(x, 1.6, z); mundo.add(o);
         raios.push({ obj: o, x, z, pego: false });
     }
+    criarTrafego(sorte);
     // borda do mundo
     const muroMat = mat('#8a8f98');
     for (const [x, z, w, d] of [[0, -MUNDO - 40, lado, 2], [0, MUNDO + 40, lado, 2], [-MUNDO - 40, 0, 2, lado], [MUNDO + 40, 0, 2, lado]]) {
@@ -388,60 +407,152 @@ function construirMundo() {
     for (const r of rampas) g.fillRect(px(r.x), px(r.z - r.W / 2), r.L * s + 1, r.W * s);
 }
 
+// ───────── trânsito: carros que andam pela faixa da direita e voltam do outro lado ─────────
+const CORES_TRAFEGO = [0xe5484d, 0x3e63dd, 0xf5f5f5, 0x2b2f36, 0x30a46c, 0xffc53d, 0x8e4ec6, 0x8d8d86];
+function criarTrafego(sorte) {
+    const tipos = ['hatch', 'suv', 'picape', 'hatch', 'suv', 'onibus'];
+    for (let n = 0; n < 22; n++) {
+        const tipo = tipos[Math.floor(sorte() * tipos.length)];
+        const visual = construirCarro(tipo, tipo === 'onibus' ? undefined : CORES_TRAFEGO[Math.floor(sorte() * CORES_TRAFEGO.length)]);
+        const c = { visual, eixo: sorte() < .5 ? 'x' : 'z', k: -MUNDO + QUADRA * (1 + Math.floor(sorte() * 7)), sentido: sorte() < .5 ? 1 : -1,
+                    t: -MUNDO + sorte() * 2 * MUNDO, v: 0, cruzeiro: (tipo === 'onibus' ? 9 : 11) + sorte() * 5 };
+        mundo.add(visual.grupo); trafego.push(c);
+    }
+}
+const posicaoNaFaixa = (c) => c.eixo === 'x' ? [c.t, c.k + 4.5 * c.sentido] : [c.k - 4.5 * c.sentido, c.t];
+function encostou(c, x, z) {   // o carro do trânsito é um retângulo: comprimento na direção em que anda
+    const [cx, cz] = posicaoNaFaixa(c), ao_longo = c.eixo === 'x' ? x - cx : z - cz, de_lado = c.eixo === 'x' ? z - cz : x - cx;
+    return Math.abs(ao_longo) < c.visual.comprimento / 2 + 1.6 && Math.abs(de_lado) < c.visual.largura / 2 + 1;
+}
+function moverTrafego(dt) {
+    for (const c of trafego) {
+        // freia se o seu carro estiver logo à frente, na mesma faixa
+        const [cx, cz] = posicaoNaFaixa(c);
+        const frente = ((c.eixo === 'x' ? pos.x : pos.z) - c.t) * c.sentido, lado = Math.abs(c.eixo === 'x' ? pos.z - cz : pos.x - cx);
+        const alvo = frente > 0 && frente < c.visual.comprimento / 2 + 12 && lado < 3 ? 0 : c.cruzeiro;
+        c.v += Math.max(-8 * dt, Math.min(3 * dt, alvo - c.v));
+        c.t += c.v * c.sentido * dt;
+        if (c.t * c.sentido > MUNDO + 20) c.t = -c.sentido * (MUNDO + 20);
+        const [x, z] = posicaoNaFaixa(c);
+        c.visual.grupo.position.set(x, alturaDoChao(x, z), z);
+        c.visual.grupo.rotation.y = c.eixo === 'x' ? (c.sentido > 0 ? 0 : Math.PI) : (c.sentido > 0 ? -Math.PI / 2 : Math.PI / 2);
+        for (const r of c.visual.rodas) r.rotation.y -= c.v * dt / (r.geometry.parameters.radiusTop || .4);
+    }
+}
+
 function alturaDoChao(x, z) {
     for (const r of rampas) if (x >= r.x && x <= r.x + r.L && Math.abs(z - r.z) <= r.W / 2) return (x - r.x) / r.L * r.H;
     return 0;
 }
 const bateu = (x, z, raio = 1.3) => predios.some(p => x > p.x0 - raio && x < p.x1 + raio && z > p.z0 - raio && z < p.z1 + raio);
 
-// ───────── o carro: formas simples, ou o modelo do Meshy, se existir ─────────
-const veiculo = new THREE.Group(), formasSimples = [];
-const pintura = mat(0xc8102e, { metalness: .4, roughness: .3 });
-const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; veiculo.add(o); formasSimples.push(o); return o; };
-// A carroceria é o DESENHO DE LADO do carro (um perfil), "esticado" para os lados com bordas arredondadas.
+// ───────── os carros: cada um é um PERFIL (desenho de lado) "esticado" para os lados ─────────
 function perfil(pontos) {
     const s = new THREE.Shape(); s.moveTo(...pontos[0]);
     for (let i = 1; i < pontos.length; i++) pontos[i].length === 4 ? s.quadraticCurveTo(...pontos[i]) : s.lineTo(...pontos[i]);
     return s;
 }
-const esticar = (forma, largura, borda) => new THREE.ExtrudeGeometry(forma, { depth: largura, bevelEnabled: true, bevelThickness: borda, bevelSize: borda, bevelSegments: 5, curveSegments: 16 }).translate(0, 0, -largura / 2);
-// Estilo da foto de referência do Mikael: tudo em LINHAS RETAS (facetado), cor de aço inox.
-pintura.color.setHex(0xb9c0c8); pintura.metalness = .85; pintura.roughness = .32;
-add(esticar(perfil([[-2.2, .3], [2.2, .3], [2.42, .38], [2.36, .58], [1.05, .8], [-.9, .93], [-2.36, .88], [-2.4, .45], [-2.2, .3]]), 1.72, .05), pintura, 0, 0, 0);
-add(esticar(perfil([[1.1, .8], [-.1, 1.2], [-1.75, .9], [1.1, .8]]), 1.36, .04), mat(0x0b0f14, { metalness: .6, roughness: .06 }), 0, 0, 0);    // vidros em triângulo
-add(esticar(perfil([[-2.2, .3], [2.2, .3], [2.3, .4], [-2.3, .4]]), 1.8, .02), mat(0x15171a, { roughness: .7 }), 0, 0, 0);                    // saia preta embaixo
-add(new THREE.BoxGeometry(.05, .035, 1.7), mat(0xffffff, { emissive: 0xe8f6ff, emissiveIntensity: 1.4 }), 2.37, .56, 0);                       // faixa de luz na frente
-for (const z of [-.92, .92]) add(new THREE.BoxGeometry(.18, .05, .03), mat(0xff8a1f, { emissive: 0xff7a00, emissiveIntensity: 1 }), 1.05, .7, z);   // pisca laranja
-const luzFreio = add(new THREE.BoxGeometry(.05, .05, 1.78), mat(0x550000, { emissive: 0x7a0000, emissiveIntensity: .8 }), -2.41, .8, 0);        // faixa vermelha atrás
-const rodas = [];
-for (const [x, z] of [[1.5, .98], [1.5, -.98], [-1.5, .98], [-1.5, -.98]]) {
-    const r = add(new THREE.CylinderGeometry(.43, .43, .32, 28), mat(0x111214, { roughness: .9 }), x, .43, z);
-    r.rotation.x = Math.PI / 2; rodas.push(r);
-    const aro = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .34, 24), mat(0x1c1f23, { metalness: .7, roughness: .35 }));
-    for (let i = 0; i < 5; i++) { const raio = new THREE.Mesh(new THREE.BoxGeometry(.035, .36, .56), mat(0x2b2f35, { metalness: .8, roughness: .3 })); raio.rotation.y = i * Math.PI / 5; aro.add(raio); }
-    r.add(aro);
-}
-const chamas = [];
-for (const z of [-.45, .45]) {
-    const ch = new THREE.Mesh(new THREE.ConeGeometry(.16, 1.2, 12), new THREE.MeshBasicMaterial({ color: 0xffa230, transparent: true, opacity: .85 }));
-    ch.rotation.z = Math.PI / 2; ch.position.set(-2.8, .62, z); ch.visible = false; veiculo.add(ch); chamas.push(ch);
-}
-cena.add(veiculo);
+const esticar = (forma, largura, borda) => new THREE.ExtrudeGeometry(forma, { depth: largura, bevelEnabled: true, bevelThickness: borda, bevelSize: borda, bevelSegments: 4, curveSegments: 12 }).translate(0, 0, -largura / 2);
+const PRETO = mat(0x15171a, { roughness: .7 });
 
-if (dados.modelo) new GLTFLoader().load(dados.modelo, (gltf) => {
-    // Ajusta o modelo: comprimento no eixo x, uns 4,6 m de comprimento e as rodas no chão.
-    const m = gltf.scene, tam = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
-    if (tam.z > tam.x) m.rotation.y = Math.PI / 2;
-    m.rotation.y += (dados.modelo_giro || 0) * Math.PI / 180;
-    m.updateMatrixWorld(true);
-    m.scale.setScalar(4.6 / new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3()).x);
-    m.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(m), centro = b.getCenter(new THREE.Vector3());
-    m.position.set(-centro.x, -b.min.y, -centro.z);
-    m.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    formasSimples.forEach(o => o.visible = false);
-    veiculo.add(m);
-}, undefined, () => {});   // se falhar, fica o carro de formas simples
+// Cada estilo é só DADOS: os pontos do perfil, as larguras, as rodas e uns detalhes.
+const ESTILOS = {
+    roadster: { cor: 0xb9c0c8, metal: .85, rugosidade: .32, borda: .05, largura: 1.72,
+        corpo: [[-2.2, .3], [2.2, .3], [2.42, .38], [2.36, .58], [1.05, .8], [-.9, .93], [-2.36, .88], [-2.4, .45]],
+        vidro: [[1.1, .8], [-.1, 1.2], [-1.75, .9]], larguraVidro: 1.36, farolY: .56, lanternaY: .8,
+        roda: .43, eixos: [1.5, -1.5], bitola: .98, rodaEscura: true, foguete: true,
+        extras: (add) => {
+            add(esticar(perfil([[-2.2, .3], [2.2, .3], [2.3, .4], [-2.3, .4]]), 1.8, .02), PRETO);
+            for (const z of [-.92, .92]) add(new THREE.BoxGeometry(.18, .05, .03), mat(0xff8a1f, { emissive: 0xff7a00, emissiveIntensity: 1 }), 1.05, .7, z);
+        } },
+    formula: { cor: 0x1f9d55, borda: .06, largura: .75,
+        corpo: [[-2.0, .15], [1.8, .15], [2.4, .22], [2.4, .3], [.8, .42], [-.3, .72], [-1.6, .68], [-2.0, .48]],
+        vidro: [[.35, .45], [-.05, .8], [-.65, .72], [-.55, .45]], larguraVidro: .5, lanternaY: .5, lanternaLargura: .3,
+        roda: .34, larguraRoda: .38, eixos: [1.55, -1.45], bitola: .86, rodaEscura: true,
+        extras: (add, pintura) => {
+            add(new THREE.BoxGeometry(.5, .05, 1.9), pintura, 2.25, .2, 0);                   // asa da frente
+            add(new THREE.BoxGeometry(.45, .06, 1.4), pintura, -1.95, .98, 0);                // asa de trás
+            for (const z of [-.5, .5]) add(new THREE.BoxGeometry(.08, .35, .06), PRETO, -1.95, .8, z);
+            add(new THREE.SphereGeometry(.2, 16, 12), mat(0xffcf33), -.25, .88, 0);           // capacete do piloto
+        } },
+    picape: { cor: 0xb03a2e, metal: .4, borda: .06, largura: 2.0,
+        corpo: [[-2.8, .45], [2.8, .45], [2.85, .85], [2.4, 1.12], [1.0, 1.18], [-2.8, 1.18], [-2.85, .8]],
+        vidro: [[1.0, 1.18], [.45, 1.85], [-.95, 1.85], [-1.15, 1.18]], larguraVidro: 1.8, farolY: .95, lanternaY: .95,
+        roda: .48, eixos: [1.85, -1.85], bitola: 1.02,
+        extras: (add) => add(new THREE.BoxGeometry(1.5, .04, 1.8), PRETO, -1.95, 1.25, 0) },   // caçamba
+    suv: { cor: 0x2b2f36, metal: .5, borda: .07, largura: 1.9,
+        corpo: [[-2.35, .4], [2.35, .4], [2.4, .75], [2.0, 1.0], [1.0, 1.08], [-2.3, 1.1], [-2.38, .75]],
+        vidro: [[1.0, 1.08], [.3, 1.62], [-2.1, 1.62], [-2.3, 1.1]], larguraVidro: 1.7, farolY: .85, lanternaY: .95,
+        roda: .42, eixos: [1.5, -1.5], bitola: .96 },
+    hatch: { cor: 0x2a7de1, borda: .07, largura: 1.68,
+        corpo: [[-1.95, .28], [1.95, .28], [2.0, .6], [1.5, .82], [.6, .92], [-1.9, .95], [-1.98, .6]],
+        vidro: [[.6, .92], [0, 1.42], [-1.7, 1.42], [-1.9, .95]], larguraVidro: 1.5, farolY: .62, lanternaY: .8,
+        roda: .33, eixos: [1.25, -1.3], bitola: .82 },
+    kart: { cor: 0xe8710a, borda: .03, largura: .95,
+        corpo: [[-.9, .08], [.9, .08], [.95, .18], [.45, .24], [-.9, .3]],
+        roda: .15, larguraRoda: .18, eixos: [.6, -.6], bitola: .56,
+        extras: (add) => {
+            add(new THREE.BoxGeometry(.4, .42, .42), mat(0x2a5bd7), -.3, .5, 0);            // piloto
+            add(new THREE.SphereGeometry(.2, 16, 12), mat(0xffffff), -.28, .86, 0);          // capacete
+        } },
+    onibus: { cor: 0xf5c400, borda: .08, largura: 2.4,
+        corpo: [[-5, .45], [5, .45], [5.05, 2.9], [-5, 2.9]],
+        vidro: [[4.97, 1.6], [4.97, 2.65], [-4.85, 2.65], [-4.85, 1.6]], larguraVidro: 2.6, bordaVidro: .02, farolY: .9, lanternaY: 1.0,
+        roda: .5, eixos: [3.3, -3.0], bitola: 1.05,
+        extras: (add) => add(new THREE.BoxGeometry(10.05, .1, 2.6), PRETO, 0, 1.3, 0) },     // faixa preta
+};
+
+function construirCarro(id, corPintura) {
+    const E = ESTILOS[id] || ESTILOS.hatch, grupo = new THREE.Group(), formas = [], rodas = [], chamas = [];
+    const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; grupo.add(o); formas.push(o); return o; };
+    const pintura = mat(corPintura ?? E.cor, { metalness: E.metal ?? .35, roughness: E.rugosidade ?? .35 });
+    const borda = E.borda ?? .06;
+    add(esticar(perfil(E.corpo), E.largura, borda), pintura);
+    if (E.vidro) add(esticar(perfil(E.vidro), E.larguraVidro, E.bordaVidro ?? .03), mat(0x0b0f14, { metalness: .6, roughness: .06 }));
+    const xs = E.corpo.map(p => p[0]), ys = E.corpo.map(p => p[1]), frente = Math.max(...xs) + borda, tras = Math.min(...xs) - borda;
+    if (E.farolY) add(new THREE.BoxGeometry(.05, .05, E.largura * .95), mat(0xffffff, { emissive: 0xe8f6ff, emissiveIntensity: 1.4 }), frente + .01, E.farolY, 0);
+    const luzFreio = E.lanternaY ? add(new THREE.BoxGeometry(.05, .06, E.lanternaLargura ?? E.largura), mat(0x550000, { emissive: 0x7a0000, emissiveIntensity: .8 }), tras - .01, E.lanternaY, 0) : null;
+    E.extras?.(add, pintura);
+    const larguraRoda = E.larguraRoda ?? .3;
+    for (const x of E.eixos) for (const lado of [-1, 1]) {
+        const r = add(new THREE.CylinderGeometry(E.roda, E.roda, larguraRoda, 24), mat(0x111214, { roughness: .9 }), x, E.roda, lado * E.bitola);
+        r.rotation.x = Math.PI / 2; rodas.push(r);
+        const aro = new THREE.Mesh(new THREE.CylinderGeometry(E.roda * .68, E.roda * .68, larguraRoda + .02, 18), mat(E.rodaEscura ? 0x1c1f23 : 0xbfc5cc, { metalness: .8, roughness: .3 }));
+        for (let i = 0; i < 5; i++) { const raio = new THREE.Mesh(new THREE.BoxGeometry(.035, larguraRoda + .04, E.roda * 1.3), mat(E.rodaEscura ? 0x2b2f35 : 0xd4d9de, { metalness: .85, roughness: .3 })); raio.rotation.y = i * Math.PI / 5; aro.add(raio); }
+        r.add(aro);
+    }
+    if (E.foguete) for (const z of [-.45, .45]) {
+        const ch = new THREE.Mesh(new THREE.ConeGeometry(.16, 1.2, 12), new THREE.MeshBasicMaterial({ color: 0xffa230, transparent: true, opacity: .85 }));
+        ch.rotation.z = Math.PI / 2; ch.position.set(tras - .4, .62, z); ch.visible = false; grupo.add(ch); chamas.push(ch);
+    }
+    return { grupo, formas, rodas, chamas, luzFreio, comprimento: frente - tras, largura: E.largura + 2 * borda, altura: Math.max(...ys) };
+}
+
+function colocarModelo(alvo, url, comprimento) {   // modelo do Meshy (.glb), se existir
+    new GLTFLoader().load(url, (gltf) => {
+        const m = gltf.scene, tam = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
+        if (tam.z > tam.x) m.rotation.y = Math.PI / 2;
+        m.updateMatrixWorld(true);
+        m.scale.setScalar(comprimento / new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3()).x);
+        m.updateMatrixWorld(true);
+        const b = new THREE.Box3().setFromObject(m), centro = b.getCenter(new THREE.Vector3());
+        m.position.set(-centro.x, -b.min.y, -centro.z);
+        m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        alvo.formas.forEach(o => o.visible = false);
+        alvo.grupo.add(m);
+    }, undefined, () => {});   // se falhar, fica o carro de formas simples
+}
+
+// O SEU carro. Estas variáveis mudam quando você escolhe outro na garagem.
+let meu, veiculo, rodas, chamas, luzFreio;
+function trocarVisual(id) {
+    if (meu) cena.remove(meu.grupo);
+    meu = construirCarro(id);
+    ({ grupo: veiculo, rodas, chamas, luzFreio } = meu);
+    cena.add(veiculo);
+    if (porId[id].modelo) colocarModelo(meu, porId[id].modelo, meu.comprimento);
+}
+trocarVisual(escolhido.carro.id);
 
 // ═════════════════ ESTADO DA CORRIDA ═════════════════
 const comando = { acelerar: false, frear: false, foguete: false, esquerda: false, direita: false };
@@ -449,12 +560,17 @@ let modo = 'arrancada', e = estadoInicial(carro), correndo = false, marcas = {},
 // no mundo aberto: posição, direção (rumo), pulo e ré
 const pos = { x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity };
 let pegos = 0, recadoAte = 0;
+let rival = null, rivalVisual = null;          // racha na arrancada
+const trafego = [];                            // carros andando pela cidade
 const recordes = (() => { try { return JSON.parse(ler('aptios_pista_recordes')) || {}; } catch { return {}; } })();
 
+// recorde separado para cada carro (e para o roadster com foguete). O roadster mantém as chaves antigas.
+const RECORDE = (chave) => chave + (ORIGINAL.id === 'roadster' ? '' : '_' + ORIGINAL.id) + (comando.foguete ? '_foguete' : '');
 function dizer(texto, segundos = 1.6) { $('recado').textContent = texto; recadoAte = segundos ? performance.now() + segundos * 1000 : Infinity; }
 
 function recomecar() {
     e = estadoInicial(carro); correndo = false; marcas = {}; velMax = 0;
+    if (rival) { rival.e = estadoInicial(rival.carro); rival.fim = false; }
     Object.assign(pos, { x: 0, y: 0, z: 0, vy: 0, rumo: 0, volante: 0, re: 0, voando: false, derrapando: false, aderenciaUsada: 0, raioCurva: Infinity });
     if (modo === 'mundo') { pos.x = -MUNDO + QUADRA * 2; pos.z = 0; for (const r of raios) { r.pego = false; r.obj.visible = true; } pegos = 0; }
     dizer(modo === 'mundo' ? 'Explore a cidade! ⚡ Pegue os raios de energia.' : 'Segure ▲ ou o botão verde para acelerar!', 0);
@@ -465,7 +581,7 @@ const atualizarContador = () => { $('contador-raios').textContent = `${pegos} / 
 function marcar(chave, valor) {
     if (marcas[chave] !== undefined) return;
     marcas[chave] = valor;
-    const k = chave + (comando.foguete ? '_foguete' : '');
+    const k = RECORDE(chave);
     if (ehOriginal() && (recordes[k] === undefined || valor < recordes[k])) { recordes[k] = valor; gravar('aptios_pista_recordes', JSON.stringify(recordes)); }
     desenharResultados();
 }
@@ -483,6 +599,14 @@ function avancar(segundos) {
             if (antes.v < 100 / 3.6 && e.v >= 100 / 3.6) marcar('zero_a_cem_s', e.t);
             if (antes.x < 400 && e.x >= 400) { marcar('quatrocentos_m_s', e.t); marcas.velocidade_400m_kmh = e.v * 3.6; }
             velMax = Math.max(velMax, e.v * 3.6);
+            if (rival) {   // o rival sempre pisa fundo, do começo ao fim
+                rival.e = passo(rival.carro, rival.e, DT, 1, 0, false);
+                if (!rival.fim && (e.x >= 400 || rival.e.x >= 400)) {
+                    rival.fim = true;
+                    const venci = e.x >= rival.e.x, diferenca = Math.abs(e.x - rival.e.x);
+                    dizer(venci ? `🏆 Você venceu o ${rival.carro.nome} por ${num(diferenca)} m!` : `😅 O ${rival.carro.nome} ganhou por ${num(diferenca)} m!`, 4);
+                }
+            }
         } else andarNoMundo(e.x - antes.x, DT);
     }
 }
@@ -515,7 +639,9 @@ function andarNoMundo(ds, dt) {
     // pulo: na rampa o carro sobe; quando a rampa acaba, ele voa e a gravidade puxa de volta
     const chao = alturaDoChao(nx, nz);
     if (!pos.voando && chao - pos.y > .8) return batida();      // bateu na parede de trás da rampa
-    if (bateu(nx, nz) && pos.y < 6) return batida();
+    if (bateu(nx, nz, Math.max(1.3, meu.largura / 2 + .3)) && pos.y < 6) return batida();
+    const carroBatido = pos.y < 2.5 && trafego.find(c => encostou(c, nx, nz));
+    if (carroBatido) { carroBatido.v = 0; return batida(); }
     pos.x = nx; pos.z = nz;
     if (pos.voando) {
         pos.vy -= G * dt; pos.y += pos.vy * dt;
@@ -579,37 +705,79 @@ function desenharResultados() {
     $('resultados').replaceChildren(...LINHAS.map(([k, nome, fmt]) => el('tr', {},
         el('td', { textContent: nome }), el('td', { textContent: minhas[k] !== undefined && k !== 'autonomia_km' ? fmt(minhas[k]) : '—' }),
         el('td', { textContent: oficial[k] ? fmt(oficial[k]) : '—' }))));
-    const k = 'zero_a_cem_s' + (comando.foguete ? '_foguete' : '');
+    const k = RECORDE('zero_a_cem_s');
     if (recordes[k] !== undefined && ehOriginal()) $('resultados').append(el('tr', {}, el('td', { textContent: '🏆 Seu recorde 0 a 100' }), el('td', { textContent: num(recordes[k], 2) + ' s' }), el('td')));
 }
 
-// Laboratório: sliders que mudam a ficha do carro
-const LAB = [['massa_kg', 'Massa', 800, 4000, 50, (v) => num(v) + ' kg'], ['potencia_kw', 'Potência', 100, 1500, 10, (v) => num(v) + ' kW'],
-             ['aderencia', 'Aderência do pneu', .2, 1.7, .05, (v) => num(v, 2) + (v < .5 ? ' (gelo!)' : v < .8 ? ' (chuva)' : v < 1.05 ? ' (pneu comum)' : ' (pneu de corrida)')],
-             ['arrasto_cda', 'Arrasto (formato)', .3, 1.4, .05, (v) => num(v, 2) + (v > .9 ? ' (caixote!)' : ' m²')]];
+// Laboratório: sliders que mudam a ficha do carro (os limites dependem do carro escolhido)
 const sliders = {};
-for (const [k, nome, min, max, step, fmt] of LAB) {
-    const valor = el('span'), input = el('input', { type: 'range', min, max, step, value: carro[k] });
-    input.setAttribute('aria-label', nome);
-    input.oninput = () => { carro[k] = +input.value; valor.textContent = fmt(carro[k]); mudouCarro(); };
-    valor.textContent = fmt(carro[k]);
-    $('laboratorio').append(el('label', { className: 'controle' }, el('div', {}, el('span', { textContent: nome }), valor), input));
-    sliders[k] = { input, valor, fmt };
+function montarLaboratorio() {
+    const B = ORIGINAL;
+    const LAB = [['massa_kg', 'Massa', B.massa_kg * .3, B.massa_kg * 2.5, B.massa_kg / 100, (v) => num(v) + ' kg'],
+                 ['potencia_kw', 'Potência', B.potencia_kw * .2, B.potencia_kw * 3, B.potencia_kw / 100, (v) => num(v) + ' kW'],
+                 ['aderencia', 'Aderência do pneu', .2, 1.8, .05, (v) => num(v, 2) + (v < .5 ? ' (gelo!)' : v < .8 ? ' (chuva)' : v < 1.05 ? ' (pneu comum)' : ' (pneu de corrida)')],
+                 ['arrasto_cda', 'Arrasto (formato)', B.arrasto_cda * .4, B.arrasto_cda * 3, B.arrasto_cda / 50, (v) => num(v, 2) + ' m²']];
+    $('laboratorio').replaceChildren();
+    for (const [k, nome, min, max, step, fmt] of LAB) {
+        const valor = el('span'), input = el('input', { type: 'range', min, max, step, value: carro[k] });
+        input.setAttribute('aria-label', nome);
+        input.oninput = () => { carro[k] = +input.value; valor.textContent = fmt(carro[k]); mudouCarro(); };
+        valor.textContent = fmt(carro[k]);
+        $('laboratorio').append(el('label', { className: 'controle' }, el('div', {}, el('span', { textContent: nome }), valor), input));
+        sliders[k] = { input, valor, fmt };
+    }
 }
-const ehOriginal = () => LAB.every(([k]) => carro[k] === ORIGINAL[k]);
+const ehOriginal = () => ['massa_kg', 'potencia_kw', 'aderencia', 'arrasto_cda'].every(k => carro[k] === ORIGINAL[k]);
 let espera;
 function mudouCarro() {
     clearTimeout(espera);
     espera = setTimeout(() => {   // recalcula a ficha só quando a criança para de mexer
-        fichaAtual = ehOriginal() ? { normal: dados.ficha, foguete: dados.ficha_foguete } : { normal: fichaJS(carro), foguete: fichaJS(carro, true) };
+        fichaAtual = ehOriginal() ? { normal: escolhido.ficha, foguete: escolhido.ficha_foguete || escolhido.ficha } : { normal: fichaJS(carro), foguete: fichaJS(carro, true) };
         if (modo === 'arrancada') recomecar();
         desenharResultados(); desenharSobre();
     }, 150);
 }
-$('b-original').onclick = () => { carro = { ...ORIGINAL }; for (const k in sliders) { sliders[k].input.value = carro[k]; sliders[k].valor.textContent = sliders[k].fmt(carro[k]); } mudouCarro(); };
+$('b-original').onclick = () => { carro = { ...ORIGINAL }; montarLaboratorio(); mudouCarro(); };
+
+// ═════════════════ GARAGEM E RACHA ═════════════════
+function escolherCarro(id) {
+    escolhido = porId[id]; ORIGINAL = escolhido.carro; carro = { ...ORIGINAL };
+    fichaAtual = { normal: escolhido.ficha, foguete: escolhido.ficha_foguete || escolhido.ficha };
+    if (!carro.foguete_n && comando.foguete) alternarFoguete();
+    $('b-foguete').disabled = !carro.foguete_n;
+    $('b-foguete').title = carro.foguete_n ? '' : 'Só o Roadster tem foguete';
+    trocarVisual(id); montarLaboratorio(); desenharGaragem(); desenharSobre(); recomecar();
+}
+function desenharGaragem() {
+    $('garagem').replaceChildren(...dados.carros.map(({ carro: c, ficha: f }) => {
+        const b = el('button', { className: 'carro-btn', onclick: () => escolherCarro(c.id) },
+            el('strong', { textContent: c.nome }),
+            el('span', { textContent: f.zero_a_cem_s ? `0–100 em ${num(f.zero_a_cem_s, 1)} s` : 'não chega a 100 km/h' }),
+            el('span', { textContent: `máx. ${num(f.velocidade_max_kmh)} km/h` }));
+        b.setAttribute('aria-pressed', c.id === escolhido.carro.id);
+        return b;
+    }));
+}
+function escolherRival(id) {
+    if (rivalVisual) arrancada.remove(rivalVisual.grupo);
+    rival = id ? { carro: porId[id].carro, e: estadoInicial(porId[id].carro), fim: false } : null;
+    rivalVisual = id ? construirCarro(id, id === escolhido.carro.id ? 0x2a5bd7 : undefined) : null;
+    if (rivalVisual) { rivalVisual.grupo.position.set(0, 0, 3); arrancada.add(rivalVisual.grupo); }
+    desenharRivais(); recomecar();
+}
+function desenharRivais() {
+    $('rivais').replaceChildren(...[[null, 'Ninguém'], ...dados.carros.map(c => [c.carro.id, c.carro.nome])].map(([id, nome]) => {
+        const b = el('button', { className: 'chip', textContent: nome, onclick: () => escolherRival(id) });
+        b.setAttribute('aria-pressed', (rival?.carro.id ?? null) === id);
+        return b;
+    }));
+}
 
 function desenharSobre() {
     const f = fichaAtual.normal;
+    $('nota-carro').textContent = ORIGINAL.id === 'roadster'
+        ? 'Os números são aproximados das promessas anunciadas para o novo roadster elétrico. O carro de verdade ainda pode mudar, e o modo foguete é uma ideia anunciada, não confirmada.'
+        : 'Números aproximados de carros elétricos parecidos com este. Não é nenhuma marca de verdade.';
     $('sobre').textContent = `${carro.nome}: ${num(carro.massa_kg)} kg, ${num(carro.potencia_kw)} kW (≈ ${num(carro.potencia_kw * 1.36)} cavalos) e bateria de ${num(carro.bateria_kwh)} kWh. `
         + `Até uns ${num(carro.potencia_kw * 1000 / (carro.aderencia * carro.massa_kg * G) * 3.6)} km/h, quem limita a arrancada é o PNEU (se empurrar mais, ele patina). `
         + `Depois, quem limita é a POTÊNCIA do motor. Lá em cima, o ARRASTO do ar fica enorme: a ${num(f.velocidade_max_kmh)} km/h ele empurra para trás com ${num(forcas(carro, f.velocidade_max_kmh / 3.6, 0, 0, false, 0).arrasto)} N!`;
@@ -663,12 +831,17 @@ const m4 = new THREE.Matrix4(), olhoSuave = new THREE.Vector3(), alvoCam = new T
 function desenhar(dt) {
     const vel = e.v * 3.6;
     for (const r of rodas) r.rotation.y -= (e.v - pos.re) * dt / .38;   // a roda gira na velocidade do carro
-    luzFreio.material.emissive.setHex(comando.frear && e.v > 0 ? 0xff1a1a : 0x7a0000);
+    luzFreio?.material.emissive.setHex(comando.frear && e.v > 0 ? 0xff1a1a : 0x7a0000);
+    const atras = meu.comprimento + 4.4, alto = Math.max(3.4, meu.altura + 1.8);
     const queimando = e.f.foguete > 0;
     for (const ch of chamas) { ch.visible = queimando; ch.scale.set(1, .8 + Math.random() * .6, 1); }
     if (modo === 'arrancada') {
         const x = e.x;
-        veiculo.position.set(x, 0, 0);
+        veiculo.position.set(x, 0, rival ? -3 : 0);
+        if (rival) {
+            rivalVisual.grupo.position.set(rival.e.x, 0, 3);
+            for (const r of rivalVisual.rodas) r.rotation.y -= rival.e.v * dt / (r.geometry.parameters.radiusTop || .4);
+        }
         const base = Math.floor(x / FAIXA) * FAIXA - 15 * FAIXA;
         for (let i = 0; i < N_FAIXAS; i++) {
             faixas.setMatrixAt(i, m4.makeTranslation(base + i * FAIXA, .01, 0));
@@ -680,7 +853,7 @@ function desenhar(dt) {
         postes.forEach((p, i) => atualizarPoste(p, (primeiro + i) * POSTE));
         grama.position.x = asfalto.position.x = x;
         camera.fov = 55 + Math.min(vel / 400, 1) * 25;
-        camera.position.set(x - 9 - Math.min(vel / 100, 3), 3.4, 3.2 + Math.sin(e.t * 30) * Math.min(vel / 4000, .05));
+        camera.position.set(x - atras - Math.min(vel / 100, 3), alto, 3.2 + Math.sin(e.t * 30) * Math.min(vel / 4000, .05));
         camera.lookAt(x + 6, .8, 0);
         $('m-dist').textContent = num(x);
     } else {
@@ -691,7 +864,8 @@ function desenhar(dt) {
         for (const r of raios) if (!r.pego) { r.obj.rotation.y += dt * 2; r.obj.position.y = 1.6 + Math.sin(performance.now() / 300 + r.x) * .3; }
         // câmera atrás do carro, chegando "macia" na posição
         const dir = new THREE.Vector3(Math.cos(pos.rumo), 0, -Math.sin(pos.rumo));
-        alvoCam.set(pos.x, pos.y, pos.z).addScaledVector(dir, -10 - Math.min(vel / 60, 4)).setY(pos.y + 4.2);
+        alvoCam.set(pos.x, pos.y, pos.z).addScaledVector(dir, -atras - 1 - Math.min(vel / 60, 4)).setY(pos.y + alto + .8);
+        moverTrafego(dt);
         olhoSuave.lerp(alvoCam, 1 - Math.exp(-dt * 6));
         if (olhoSuave.distanceTo(alvoCam) > 40) olhoSuave.copy(alvoCam);
         camera.position.copy(olhoSuave);
@@ -716,6 +890,8 @@ function desenharMinimapa() {
     if (!mapaFundo) return;
     const lado = 2 * MUNDO + 200, s = 320 / lado, px = (v) => (v + lado / 2) * s;
     mapa.drawImage(mapaFundo, 0, 0);
+    mapa.fillStyle = '#ffffff';
+    for (const c of trafego) { const [x, z] = posicaoNaFaixa(c); mapa.fillRect(px(x) - 2, px(z) - 2, 4, 4); }
     mapa.fillStyle = '#ffd23f';
     for (const r of raios) if (!r.pego) { mapa.beginPath(); mapa.arc(px(r.x), px(r.z), 5, 0, 7); mapa.fill(); }
     mapa.save(); mapa.translate(px(pos.x), px(pos.z)); mapa.rotate(-pos.rumo);
@@ -743,7 +919,7 @@ renderer.setAnimationLoop(() => {
     if ((painelT += dt) > .1) { painelT = 0; desenharForcas(); }   // o painel não precisa de 60 quadros
     renderer.render(cena, camera);
 });
-recomecar(); desenharSobre(); desenharForcas();
+montarLaboratorio(); desenharGaragem(); desenharRivais(); recomecar(); desenharSobre(); desenharForcas();
 </script>
 </body>
 </html>

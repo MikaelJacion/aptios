@@ -14,13 +14,12 @@ from aptios.oficina.aplicacao import Oficina  # noqa: E402
 from aptios.oficina.catalogo import CATALOGO, PACOTES, RIVAIS  # noqa: E402
 from aptios.oficina.infra import ExploradoresEmMemoria, PagamentoDesativado  # noqa: E402
 
-from aptios.pista.fisica import ROADSTER, ficha  # noqa: E402
+from aptios.pista.aplicacao import dados_da_pista  # noqa: E402
 
 qual = sys.argv[2] if len(sys.argv) > 2 else "oficina"
 pagina = (Path(__file__).resolve().parent.parent / f"aptios/interface/static/{qual}.html").read_text(encoding="utf-8")
 if qual == "pista":
-    variavel, demo = "APTIOS_PISTA", {"carro": asdict(ROADSTER), "ficha": ficha(ROADSTER),
-                                       "ficha_foguete": ficha(ROADSTER, foguete=True)}
+    variavel, demo = "APTIOS_PISTA", dados_da_pista()
 else:
     oficina = Oficina(CATALOGO, ExploradoresEmMemoria(), PagamentoDesativado(), PACOTES)
     variavel, demo = "APTIOS_DEMO", {

@@ -27,6 +27,7 @@ REGENERACAO = 0.5   # ao frear, o motor vira gerador e devolve metade da energia
 class CarroEletrico:
     """VALUE OBJECT: a ficha técnica (os números não mudam durante a corrida)."""
 
+    id: str
     nome: str
     massa_kg: float
     potencia_kw: float
@@ -117,11 +118,29 @@ def ficha(carro: CarroEletrico, foguete: bool = False) -> dict[str, float]:
 # (0 a 100 em ~2 s, mais de 400 km/h, ~1000 km de autonomia). O carro de verdade
 # ainda pode mudar. O modo foguete é uma ideia anunciada, não confirmada.
 ROADSTER = CarroEletrico(
-    nome="Roadster Elétrico", massa_kg=2000, potencia_kw=950, aderencia=1.4,
+    id="roadster", nome="Roadster Elétrico", massa_kg=2000, potencia_kw=950, aderencia=1.4,
     arrasto_cda=0.45, rolamento=0.012, bateria_kwh=200, limite_kmh=400,
     foguete_n=20000, foguete_s=8,
 )
 
+
+
+# A GARAGEM: carros elétricos "genéricos" (sem marca), com números aproximados de carros reais.
+CARROS = [
+    ROADSTER,
+    CarroEletrico(id="formula", nome="Fórmula Elétrico", massa_kg=900, potencia_kw=350, aderencia=1.7,
+                  arrasto_cda=1.1, rolamento=0.012, bateria_kwh=50, limite_kmh=280),
+    CarroEletrico(id="picape", nome="Picape Elétrica", massa_kg=3000, potencia_kw=600, aderencia=0.95,
+                  arrasto_cda=1.1, rolamento=0.013, bateria_kwh=130, limite_kmh=180),
+    CarroEletrico(id="suv", nome="SUV Elétrico", massa_kg=2400, potencia_kw=300, aderencia=1.0,
+                  arrasto_cda=0.85, rolamento=0.011, bateria_kwh=100, limite_kmh=200),
+    CarroEletrico(id="hatch", nome="Hatch Elétrico", massa_kg=1500, potencia_kw=100, aderencia=0.9,
+                  arrasto_cda=0.65, rolamento=0.011, bateria_kwh=50, limite_kmh=150),
+    CarroEletrico(id="kart", nome="Kart Elétrico", massa_kg=200, potencia_kw=15, aderencia=1.1,
+                  arrasto_cda=0.5, rolamento=0.015, bateria_kwh=5, limite_kmh=80),
+    CarroEletrico(id="onibus", nome="Ônibus Escolar Elétrico", massa_kg=13000, potencia_kw=300, aderencia=0.7,
+                  arrasto_cda=6.0, rolamento=0.008, bateria_kwh=300, limite_kmh=90),
+]
 
 
 def velocidade_max_na_curva(carro: CarroEletrico, raio_m: float) -> float:

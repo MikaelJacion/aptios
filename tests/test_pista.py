@@ -46,9 +46,9 @@ def test_rota_da_pista():
     from aptios.interface.web import criar_app
     from tests.test_oficina import TutorQueNaoFala, oficina
     c = TestClient(criar_app(TutorQueNaoFala(), oficina()))
-    dados = c.get("/api/pista/carro").json()
-    assert dados["carro"]["nome"] == "Roadster Elétrico"
-    assert dados["ficha_foguete"]["zero_a_cem_s"] < dados["ficha"]["zero_a_cem_s"]
+    carros = {c["carro"]["id"]: c for c in c.get("/api/pista/carro").json()["carros"]}
+    assert carros["roadster"]["ficha_foguete"]["zero_a_cem_s"] < carros["roadster"]["ficha"]["zero_a_cem_s"]
+    assert "ficha_foguete" not in carros["onibus"]          # só o roadster tem foguete
     assert "Pista Aptios" in c.get("/pista").text
 
 
@@ -58,3 +58,12 @@ def test_curva_mais_aberta_permite_mais_velocidade():
     assert abs(velocidade_max_na_curva(ROADSTER, 200) / v50 - 2) < 1e-9   # raio 4× maior = 2× mais rápido
     gelo = replace(ROADSTER, aderencia=0.3)
     assert velocidade_max_na_curva(gelo, 50) < v50 / 2                     # no gelo, devagar!
+
+
+def test_garagem_faz_sentido():
+    from aptios.pista.fisica import CARROS
+    f = {c.id: ficha(c) for c in CARROS}
+    assert len({c.id for c in CARROS}) == len(CARROS)
+    assert f["roadster"]["zero_a_cem_s"] < f["suv"]["zero_a_cem_s"] < f["hatch"]["zero_a_cem_s"]
+    assert f["kart"]["zero_a_cem_s"] == 0 and f["onibus"]["zero_a_cem_s"] == 0   # nem chegam a 100 km/h!
+    assert f["onibus"]["autonomia_km"] < f["roadster"]["autonomia_km"]           # ônibus é um caixote
