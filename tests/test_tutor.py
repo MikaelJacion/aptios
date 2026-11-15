@@ -117,3 +117,15 @@ def test_pagina_inicial_abre():
     ia = c.get("/ia")
     assert ia.status_code == 200 and "IA da Aptios" in ia.text and 'data-kit="pista"' in ia.text
     assert "Oficina Aptios" in TestClient(criar_app(TutorFalso(), nova_oficina())).get("/oficina").text
+
+
+def test_app_de_celular():
+    c = TestClient(criar_app(TutorFalso(), nova_oficina()))
+    m = c.get("/manifest.webmanifest")
+    assert m.headers["content-type"].startswith("application/manifest+json")
+    assert {i["sizes"] for i in m.json()["icons"]} >= {"192x192", "512x512"}
+    sw = c.get("/sw.js")
+    assert "javascript" in sw.headers["content-type"] and "/api/" in sw.text
+    for pagina in ("/", "/ia", "/oficina", "/pista"):
+        assert 'rel="manifest"' in c.get(pagina).text
+    assert c.get("/static/icone-512.png").content[:4] == b"\x89PNG"

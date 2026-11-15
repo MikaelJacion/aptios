@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Oficina Aptios</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2a5bd7">
+<link rel="icon" href="/static/icone-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;800&display=swap">
 <style>
@@ -84,7 +91,8 @@ body {
 }
 
 .painel { background: var(--painel); border-left: 1px solid var(--linha); display: flex; flex-direction: column; min-height: 0; }
-.abas { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--linha); }
+.abas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--linha); }
+.abas::-webkit-scrollbar { display: none; }
 .aba {
     font: 600 .92rem var(--fonte-titulo); background: none; border: 0; color: var(--suave);
     padding: 12px 4px; cursor: pointer; border-bottom: 3px solid transparent;
@@ -178,6 +186,13 @@ body {
     .painel { border-left: 0; border-top: 1px solid var(--linha); }
     .conteudo { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 }
+/* CELULAR: botões maiores para o dedo, e a bancada não "puxa" a página quando arrasta */
+@media (pointer: coarse) {
+    .ferr { padding: 10px 12px; }
+    .aba { padding-inline: 14px; }
+    .bancada canvas { touch-action: none; }
+    .bancada { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
 @media (prefers-reduced-motion: reduce) { .saldo.pulo { animation: none; } }
 </style>
 <script type="importmap">
@@ -207,7 +222,7 @@ body {
             <button class="ferr ligar" id="ligar">▶ Ligar robô</button>
             <span class="status" id="status">Carregando…</span>
         </div>
-        <p class="dica">Clique para colocar a peça. Arraste para girar a câmera e use a rodinha ou dois dedos para o zoom.</p>
+        <p class="dica" id="dica">Clique para colocar a peça. Arraste para girar a câmera e use a rodinha ou dois dedos para o zoom.</p>
     </section>
 
     <aside class="painel">
@@ -1162,6 +1177,7 @@ async function desenharArena(c) {
 document.querySelectorAll('.aba').forEach(b => b.onclick = () => { if (!luta) { aba = b.dataset.aba; desenharPainel(); } });
 
 // ═════════════════════════ COMEÇAR ═════════════════════════
+if (matchMedia('(pointer: coarse)').matches) $('dica').textContent = 'Toque para colocar a peça. Arraste com um dedo para girar a câmera e use dois dedos para o zoom.';
 (async () => {
     if (api.demo) { $('selo-demo').hidden = false; $('link-tutor').hidden = $('link-pista').hidden = true; }
     try {

@@ -97,6 +97,16 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
     async def pagina_inicio() -> FileResponse:
         return FileResponse(PASTA_ESTATICA / "inicio.html")
 
+    # app de celular (PWA): o manifesto e o service worker precisam ficar na raiz do site
+    @app.get("/manifest.webmanifest")
+    async def manifesto() -> FileResponse:
+        return FileResponse(PASTA_ESTATICA / "manifest.webmanifest", media_type="application/manifest+json")
+
+    @app.get("/sw.js")
+    async def service_worker() -> FileResponse:
+        return FileResponse(PASTA_ESTATICA / "sw.js", media_type="application/javascript",
+                            headers={"Cache-Control": "no-cache"})
+
     @app.get("/ia")
     async def pagina_ia() -> FileResponse:
         return FileResponse(PASTA_ESTATICA / "ia.html")

@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IA da Aptios</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2a5bd7">
+<link rel="icon" href="/static/icone-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});</script>
 <style>
 :root {
     --bg: #f4f7fb; --card: #ffffff; --texto: #1d2433; --suave: #5b6578;
