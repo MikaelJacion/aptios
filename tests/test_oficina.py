@@ -182,7 +182,16 @@ def test_batalha_pelo_site():
         ("roda_pequena", 2, 0, -3), ("roda_pequena", -3, 0, 1), ("roda_pequena", 2, 0, 1)]]
     assert c.put("/api/oficina/robo", headers=h, json={"pecas": carrinho}).status_code == 200
     arena = c.get("/api/oficina/arena", headers=h).json()
-    assert arena["meus_atributos"] and len(arena["rivais"]) == 3
+    assert arena["meus_atributos"] and len(arena["rivais"]) == 9
     r = c.post("/api/oficina/batalhas/lata_velha", headers=h).json()
     assert r["vencedor"] in ("voce", "rival", "empate") and r["golpes"]
     assert r["saldo"] == r["premio"]
+
+
+def test_pecas_destravam_golpes():
+    from aptios.oficina.catalogo import RIVAIS
+    golpes = {r.id: calcular_atributos(r.pecas, CATALOGO).golpes for r in RIVAIS}
+    assert golpes["lata_velha"] == ("encontrao",)
+    assert {"garrada", "martelada", "turbo", "laser"} <= set(golpes["mega_garra"])
+    luta, _ = lutar(calcular_atributos(RIVAIS[7].pecas, CATALOGO), calcular_atributos(RIVAIS[0].pecas, CATALOGO), 3)
+    assert all(g.golpe in golpes["mega_garra"] for g in luta if g.atacante == "voce")

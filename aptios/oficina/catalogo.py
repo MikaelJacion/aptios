@@ -137,22 +137,55 @@ def _robo(*pecas: tuple) -> tuple[PecaColocada, ...]:
 
 
 # Rivais da Arena. Cada um paga o prêmio só na primeira vitória.
+# Ordem: do mais fraco ao mais forte (um teste confere isso).
 RIVAIS = [
+    # ── fáceis ──
     Rival("lata_velha", "Lata Velha", "facil", 20, "Um carrinho simples. Ótimo para treinar!", _robo(
         ("placa_4x6", -2, 0, -3, 0), ("controlador", -1, 1, -2, 0),
         ("roda_pequena", -3, 0, -3, 0), ("roda_pequena", 2, 0, -3, 0),
         ("roda_pequena", -3, 0, 1, 0), ("roda_pequena", 2, 0, 1, 0))),
-    Rival("trator_bravo", "Trator Bravo", "medio", 40, "Esteiras e muita vida. Difícil de derrubar.", _robo(
+    Rival("besouro", "Besouro Pisca", "facil", 25, "Pisca o LED na sua cara para você errar o golpe.", _robo(
+        ("placa_4x6", -2, 0, -3, 0), ("controlador", -1, 1, -2, 0),
+        ("roda_pequena", -3, 0, -3, 0), ("roda_pequena", 2, 0, -3, 0),
+        ("sensor_toque", -2, 1, -3, 0), ("sensor_toque", 1, 1, -3, 0), ("led", -2, 1, 2, 0), ("antena", 1, 1, 2, 0))),
+    Rival("zumbido", "Zumbido", "facil", 30, "Rodas grandes e mira laser. Pequeno, mas ligeiro!", _robo(
+        ("placa_4x6", -2, 0, -3, 0), ("controlador", -1, 1, -2, 0),
+        ("roda_grande", -3, 0, -3, 0), ("roda_grande", 2, 0, -3, 0),
+        ("motor", -1, 1, 1, 0), ("sensor_distancia", -1, 1, -3, 0))),
+    # ── médios ──
+    Rival("muralha", "Muralha", "medio", 35, "Uma parede de blocos sobre esteiras. Quase não sente os golpes.", _robo(
+        ("placa_4x6", -2, 0, -3, 0), ("esteira", -3, 0, -3, 0), ("esteira", 2, 0, -3, 0),
+        ("controlador", -1, 1, -3, 0), ("bloco_2x4", -2, 1, 0, 0), ("bloco_2x4", 0, 1, 0, 0),
+        ("bloco_2x4", -2, 2, 0, 0), ("bloco_2x4", 0, 2, 0, 0), ("bloco_2x4", -2, 3, -3, 0), ("bloco_2x4", 0, 3, -3, 0),
+        ("viga_1x6", -2, 4, -3, 0), ("viga_1x6", 1, 4, -3, 0), ("led", -1, 5, -2, 0))),
+    Rival("escorpiao", "Escorpião", "medio", 40, "Garra na frente e dois braços com servo: belisca e martela.", _robo(
+        ("placa_4x6", -2, 0, -3, 0), ("controlador", -1, 1, -2, 0),
+        ("roda_pequena", -3, 0, -3, 0), ("roda_pequena", 2, 0, -3, 0), ("roda_pequena", -3, 0, 1, 0), ("roda_pequena", 2, 0, 1, 0),
+        ("garra", -1, 1, 1, 0), ("servo", -2, 1, -2, 0), ("servo", 1, 1, -2, 0), ("sensor_cor", -2, 1, 1, 0), ("motor", -1, 3, -2, 0))),
+    Rival("trator_bravo", "Trator Bravo", "medio", 45, "Esteiras e muita vida. Difícil de derrubar.", _robo(
         ("placa_4x6", -2, 0, -3, 0), ("esteira", -3, 0, -3, 0), ("esteira", 2, 0, -3, 0),
         ("controlador", -1, 1, -3, 0), ("motor", -2, 1, 0, 0), ("motor", 0, 1, 0, 0),
         ("bloco_2x4", -2, 3, -1, 0), ("bloco_2x4", 0, 3, -1, 0), ("garra", -1, 1, 2, 0))),
-    Rival("mega_garra", "Mega Garra", "dificil", 80, "Rápido, mira certeira e duas garras. O chefão da Arena!", _robo(
+    # ── difíceis ──
+    Rival("relampago", "Relâmpago", "dificil", 60, "Quatro motores! Ataca primeiro e quase não deixa você acertar.", _robo(
+        ("placa_4x6", -2, 0, -3, 0),
+        ("roda_grande", -3, 0, -3, 0), ("roda_grande", 2, 0, -3, 0), ("roda_grande", -3, 0, 0, 0), ("roda_grande", 2, 0, 0, 0),
+        ("controlador", -1, 1, -3, 0), ("motor", -2, 1, 0, 0), ("motor", 0, 1, 0, 0), ("motor", -1, 3, -3, 0), ("motor", -1, 3, 0, 0),
+        ("garra", -1, 1, 2, 0), ("sensor_distancia", -1, 1, -4, 0), ("sensor_cor", 1, 1, -3, 0), ("sensor_toque", -2, 1, -3, 0))),
+    Rival("mega_garra", "Mega Garra", "dificil", 80, "Rápido, mira certeira e duas garras.", _robo(
         ("placa_4x6", -2, 0, -3, 0),
         ("roda_grande", -3, 0, -3, 0), ("roda_grande", 2, 0, -3, 0), ("roda_grande", -3, 0, 0, 0), ("roda_grande", 2, 0, 0, 0),
         ("controlador", -1, 1, -3, 0), ("motor", -2, 1, 0, 0), ("motor", 0, 1, 0, 0), ("motor", -1, 3, -3, 0),
         ("garra", -2, 1, 2, 0), ("garra", 0, 1, 2, 0), ("servo", -2, 1, -3, 0),
         ("sensor_distancia", -1, 1, -4, 0), ("sensor_cor", 1, 1, -3, 0),
         ("bloco_2x4", -2, 3, -1, 0), ("bloco_2x4", 0, 3, -1, 0), ("bloco_2x2", -1, 5, -3, 0))),
+    Rival("tita", "Titã de Aço", "dificil", 120, "O chefão final da Arena: tem quase todos os golpes. Boa sorte!", _robo(
+        ("placa_4x6", -2, 0, -3, 0), ("esteira", -3, 0, -3, 0), ("esteira", 2, 0, -3, 0),
+        ("controlador", -1, 1, -3, 0), ("motor", -2, 1, 0, 0), ("motor", 0, 1, 0, 0), ("motor", -1, 3, -3, 0),
+        ("garra", -2, 1, 3, 0), ("garra", 0, 1, 3, 0), ("servo", -2, 1, -3, 0), ("servo", 1, 1, -3, 0),
+        ("sensor_distancia", -1, 1, -4, 0), ("sensor_cor", 1, 3, -3, 0), ("sensor_toque", -2, 3, -3, 0),
+        ("bloco_2x4", -2, 3, -1, 0), ("bloco_2x4", 0, 3, -1, 0), ("bloco_2x4", -2, 4, -1, 0), ("bloco_2x4", 0, 4, -1, 0),
+        ("placa_4x6", -2, 5, -3, 0), ("led", 1, 6, 1, 0))),
 ]
 
 CATALOGO = Catalogo(

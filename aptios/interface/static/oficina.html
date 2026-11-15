@@ -135,6 +135,8 @@ body {
 .ficha-linha { display: grid; grid-template-columns: 92px 1fr 34px; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
 .barra { height: 9px; border-radius: 5px; background: var(--linha); overflow: hidden; }
 .barra > i { display: block; height: 100%; background: var(--azul); border-radius: 5px; transition: width .35s ease; }
+.golpes { display: flex; flex-wrap: wrap; gap: 5px; }
+.golpe { font: 600 .74rem var(--fonte-titulo); border: 1px solid var(--linha); border-radius: 999px; padding: 2px 9px; background: var(--fundo); cursor: help; }
 .rival { border: 1px solid var(--linha); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
 .rival h3 { margin: 0; font: 600 1rem var(--fonte-titulo); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .rival p { margin: 0; font-size: .86rem; color: var(--suave); }
@@ -262,19 +264,31 @@ function apiDemo({ catalogo, respostas, rivais }) {
             defesa: Math.min(est.length * 2 + conta('esteira') * 4, 30),
             velocidade: Math.min(2 + mot * 3 + conta('roda_grande') * 2 - conta('esteira'), 20),
             precisao: Math.min(55 + conta('sensor_distancia') * 15 + conta('sensor_cor') * 8 + conta('sensor_toque') * 4, 95),
+            golpes: Object.keys(catalogo.golpes).filter(g => { const m = catalogo.golpes[g]; return !m.peca || conta(m.peca) >= (m.peca === 'motor' ? 2 : 1); }),
         };
     }
     function lutarJS(voce, rival) {
-        const vida = { voce: voce.vida, rival: rival.vida }, ficha = { voce, rival }, golpes = [];
+        const vida = { voce: voce.vida, rival: rival.vida }, ficha = { voce, rival }, golpes = [], ofuscado = { voce: false, rival: false };
+        const sorteio = (n) => Math.floor(Math.random() * n);
         let vez = voce.velocidade > rival.velocidade || (voce.velocidade === rival.velocidade && Math.random() > .5) ? 'voce' : 'rival';
         for (let n = 0; n < 24; n++) {
             const alvo = vez === 'voce' ? 'rival' : 'voce', a = ficha[vez], d = ficha[alvo];
-            const acertou = Math.random() * 100 < a.precisao - Math.min(d.velocidade * 1.5, 25);
-            const dano = acertou ? Math.max(2, a.ataque - Math.floor(d.defesa / 3) + Math.floor(Math.random() * 5)) : 0;
+            const nome = a.golpes[sorteio(a.golpes.length)], mov = catalogo.golpes[nome];
+            const chance = a.precisao + mov.mira - Math.min(d.velocidade * 1.5, 25) - (ofuscado[vez] ? 25 : 0);
+            ofuscado[vez] = false;
+            const acertou = Math.random() * 100 < chance;
+            let dano = 0, efeito = '';
+            if (acertou) {
+                const defesa = nome === 'garrada' ? 0 : Math.floor(d.defesa / 3), extra = nome === 'turbo' ? Math.floor(a.velocidade / 2) : 0;
+                dano = Math.max(2, Math.round(a.ataque * mov.dano) + extra - defesa + sorteio(5));
+                if (nome === 'laser' && Math.random() < .3) { dano *= 2; efeito = 'critico'; }
+                else if (nome === 'martelada' && Math.random() < .3) efeito = 'tonto';
+                else if (nome === 'pisca') { efeito = 'ofuscado'; ofuscado[alvo] = true; }
+            }
             vida[alvo] = Math.max(0, vida[alvo] - dano);
-            golpes.push({ atacante: vez, acertou, dano, vida_voce: vida.voce, vida_rival: vida.rival });
+            golpes.push({ atacante: vez, golpe: nome, acertou, dano, vida_voce: vida.voce, vida_rival: vida.rival, efeito });
             if (!vida[alvo]) break;
-            vez = alvo;
+            if (efeito !== 'tonto') vez = alvo;
         }
         return { golpes, vencedor: vida.voce > vida.rival ? 'voce' : vida.rival > vida.voce ? 'rival' : 'empate' };
     }
@@ -741,23 +755,52 @@ function passoDaLuta(dt) {
     const atac = sou ? L.meu : L.dele, alvo = sou ? L.dele : L.meu;
     const xAtac = sou ? -6 : 6, xAlvo = -xAtac, f = L.t / DURACAO_GOLPE;
     const avanco = f < .4 ? f / .4 : Math.max(0, 1 - (f - .4) / .6);   // vai rápido, volta devagar
-    atac.veiculo.position.x = xAtac + (sou ? 1 : -1) * 3.4 * Math.sin(avanco * Math.PI / 2);
-    alvo.veiculo.position.x = xAlvo + (g.acertou && f > .4 && f < .7 ? Math.sin(L.t * 70) * .18 : 0);
+    // Cada golpe tem um jeito de se mexer
+    const alcance = { turbo: 4.6, atropelar: 4.2, laser: 1.2, pisca: 1.2 }[g.golpe] ?? 3.4;
+    atac.veiculo.position.x = xAtac + (sou ? 1 : -1) * alcance * Math.sin(avanco * Math.PI / 2);
+    atac.veiculo.position.y = g.golpe === 'martelada' ? Math.sin(Math.min(f / .4, 1) * Math.PI) * .9 : 0;   // pula e bate de cima
+    const doeu = g.acertou && f > .4 && f < .75;
+    alvo.veiculo.position.x = xAlvo + (doeu ? Math.sin(L.t * 70) * (g.efeito === 'critico' ? .35 : .18) : 0);
+    alvo.veiculo.position.y = doeu && g.golpe === 'atropelar' ? -.25 : 0;                                  // amassado!
+    alvo.veiculo.rotation.x = doeu && g.efeito === 'tonto' ? Math.sin(L.t * 25) * .25 : 0;                  // fica tonto
+    efeitoDeLuz(g, atac, alvo, f);
     if (!L.bateu && f >= .4) {
         L.bateu = true;
         L.vida = { voce: g.vida_voce, rival: g.vida_rival };
         const quem = sou ? 'Você' : L.rival.nome;
-        L.relato.unshift(g.acertou ? `💥 ${quem} acertou: −${g.dano}` : `💨 ${quem} errou!`);
+        const m = catalogo.golpes?.[g.golpe] || { emoji: '💥', nome: 'Golpe' };
+        const EFEITOS = { critico: ' 🎯 CRÍTICO!', tonto: ' 😵 ficou tonto e perdeu a vez!', ofuscado: ' ✨ ficou ofuscado!' };
+        L.relato.unshift(g.acertou ? `${m.emoji} ${quem}: ${m.nome}! −${g.dano}${EFEITOS[g.efeito] || ''}` : `💨 ${quem} tentou ${m.nome} e errou!`);
+        $('status').textContent = `${quem}: ` + (g.acertou ? `${m.emoji} ${m.nome}${g.efeito === 'critico' ? ' CRÍTICO!' : ''}` : '💨 errou!');
         if (aba === 'arena') desenharPainel();
     }
     if (f >= 1) {
-        atac.veiculo.position.x = xAtac; alvo.veiculo.position.x = xAlvo;
+        atac.veiculo.position.set(xAtac, 0, 0); alvo.veiculo.position.set(xAlvo, 0, 0); alvo.veiculo.rotation.x = 0;
         L.i++; L.t = 0; L.bateu = false;
         if (L.i >= L.res.golpes.length) { L.fim = true; eu = L.res; mostrarSaldo(L.res.premio > 0); desenharPainel(); }
     }
 }
 
+// Raio do laser e clarão do pisca-pisca (criados uma vez só e reaproveitados)
+let feixeLaser = null, clarao = null;
+function efeitoDeLuz(g, atac, alvo, f) {
+    if (!feixeLaser) {
+        feixeLaser = new THREE.Mesh(new THREE.BoxGeometry(1, .14, .14), new THREE.MeshBasicMaterial({ color: 0xff2d55, transparent: true, opacity: .8 }));
+        clarao = new THREE.PointLight(0xfff3a0, 0, 14);
+        cena.add(feixeLaser, clarao);
+    }
+    const ligado = f > .25 && f < .6;
+    feixeLaser.visible = g.golpe === 'laser' && ligado;
+    if (feixeLaser.visible) {
+        const a = atac.veiculo.position, b = alvo.veiculo.position, fim = g.acertou ? b.x : b.x + (b.x > a.x ? 4 : -4);
+        feixeLaser.scale.x = Math.abs(fim - a.x); feixeLaser.position.set((a.x + fim) / 2, 1.2, g.acertou ? 0 : .8);
+    }
+    clarao.intensity = g.golpe === 'pisca' && ligado ? 60 * Math.abs(Math.sin(f * 40)) : 0;
+    clarao.position.set(atac.veiculo.position.x, 2.5, 0);
+}
+
 function sairDaLuta() {
+    if (feixeLaser) { feixeLaser.visible = false; clarao.intensity = 0; }
     for (const item of robo) { cena.add(item.obj); posicionar(item.obj, porId()[item.peca_id], item.x, item.y, item.z, item.giro); }
     cena.remove(luta.meu.veiculo); cena.remove(luta.dele.veiculo);
     luta = null;
@@ -873,6 +916,10 @@ function ficha(a) {
         const barra = el('div', { className: 'barra' }, el('i', { style: `width:${Math.round(100 * a[k] / max)}%` }));
         f.append(el('div', { className: 'ficha-linha' }, el('span', { textContent: nome }), barra, el('span', { textContent: a[k] + (k === 'precisao' ? '%' : '') })));
     }
+    if (a.golpes && catalogo.golpes) f.append(el('div', { className: 'golpes' }, ...a.golpes.map(g => {
+        const m = catalogo.golpes[g];
+        return el('span', { className: 'golpe', textContent: `${m.emoji} ${m.nome}`, title: m.descricao });
+    })));
     return f;
 }
 
@@ -905,7 +952,7 @@ async function desenharArena(c) {
     c.replaceChildren(el('h2', { textContent: '🤖 Seu robô' }));
     if (dados.meus_atributos) c.append(ficha(dados.meus_atributos));
     else c.append(el('p', { className: 'explica', textContent: '🔧 ' + maiuscula(dados.problema) + '. Monte na bancada e volte aqui!' }));
-    c.append(el('p', { className: 'explica', textContent: 'Cada peça muda a ficha: estrutura dá vida e defesa, garras e servos dão ataque, motores dão velocidade e sensores melhoram a mira.' }),
+    c.append(el('p', { className: 'explica', textContent: 'Cada peça muda a ficha: estrutura dá vida e defesa, garras e servos dão ataque, motores dão velocidade e sensores melhoram a mira. Peças especiais destravam golpes novos: garra, servo, 2 motores, esteira, sensor de distância e LED.' }),
         el('h2', { textContent: 'Rivais' }));
     for (const r of dados.rivais) {
         const b = el('button', { className: 'botao', textContent: '⚔️ Lutar!', disabled: !dados.meus_atributos, onclick: () => comecarLuta(r) });
