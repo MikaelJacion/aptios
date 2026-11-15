@@ -260,11 +260,11 @@ function apiDemo({ catalogo, respostas, rivais }) {
         if (conta('roda_pequena', 'roda_grande') < 2 && !conta('esteira')) erro('o robô precisa de rodas (2 ou mais) ou de uma esteira para lutar');
         const est = ps.filter(p => p.categoria === 'estrutura'), blocos = est.reduce((t, p) => t + p.tamanho[0] * p.tamanho[2], 0), mot = conta('motor');
         return {
-            vida: Math.min(60 + blocos * 2 + conta('esteira') * 15, 200),
-            ataque: Math.min(6 + conta('garra') * 9 + conta('servo') * 5 + mot * 3, 60),
-            defesa: Math.min(est.length * 2 + conta('esteira') * 4, 30),
-            velocidade: Math.min(2 + mot * 3 + conta('roda_grande') * 2 - conta('esteira'), 20),
-            precisao: Math.min(55 + conta('sensor_distancia') * 15 + conta('sensor_cor') * 8 + conta('sensor_toque') * 4, 95),
+            vida: Math.min(60 + blocos * 2 + conta('esteira') * 15 + conta('bateria') * 10, 200),
+            ataque: Math.min(6 + conta('garra') * 9 + conta('servo') * 5 + mot * 3 + conta('disco') * 10 + conta('helice') * 3 + conta('bobina') * 4, 60),
+            defesa: Math.min(est.length * 2 + conta('esteira') * 4 + conta('blindagem') * 4 + conta('giroscopio') * 2, 30),
+            velocidade: Math.min(2 + mot * 3 + conta('roda_grande') * 2 - conta('esteira') + conta('bateria') * 3, 20),
+            precisao: Math.min(55 + conta('sensor_distancia') * 15 + conta('sensor_cor') * 8 + conta('sensor_toque') * 4 + conta('camera') * 12 + conta('giroscopio') * 6, 95),
             golpes: Object.keys(catalogo.golpes).filter(g => { const m = catalogo.golpes[g]; return !m.peca || conta(m.peca) >= (m.peca === 'motor' ? 2 : 1); }),
         };
     }
@@ -283,7 +283,7 @@ function apiDemo({ catalogo, respostas, rivais }) {
                 const defesa = nome === 'garrada' ? 0 : Math.floor(d.defesa / 3), extra = nome === 'turbo' ? Math.floor(a.velocidade / 2) : 0;
                 dano = Math.max(2, Math.round(a.ataque * mov.dano) + extra - defesa + sorteio(5));
                 if (nome === 'laser' && Math.random() < .3) { dano *= 2; efeito = 'critico'; }
-                else if (nome === 'martelada' && Math.random() < .3) efeito = 'tonto';
+                else if ((nome === 'martelada' && Math.random() < .3) || (nome === 'choque' && Math.random() < .5)) efeito = 'tonto';
                 else if (nome === 'pisca') { efeito = 'ofuscado'; ofuscado[alvo] = true; }
             }
             vida[alvo] = Math.max(0, vida[alvo] - dano);
@@ -411,7 +411,14 @@ function forma(p) {
             break;
         }
         case 'motor':
-            if (p.id === 'garra') {
+            if (p.id === 'disco') {          // disco com dentes
+                add(new THREE.CylinderGeometry(.25, .25, H * .5, 12), mat('#555'), 0, -H * .2, 0);
+                const disco = add(new THREE.CylinderGeometry(w / 2 - .05, w / 2 - .05, .14, 24), mat(p.cor, { metalness: .8, roughness: .25 }), 0, H * .2, 0); disco.userData.gira = true;
+                for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; const dente = new THREE.Mesh(new THREE.BoxGeometry(.3, .14, .18), disco.material); dente.position.set(Math.cos(a) * (w / 2 - .05), 0, Math.sin(a) * (w / 2 - .05)); dente.rotation.y = -a; disco.add(dente); }
+            } else if (p.id === 'helice') {  // duas pás
+                add(new THREE.CylinderGeometry(.2, .25, H * .7, 12), mat('#555'), 0, -H * .1, 0);
+                for (const a of [0, Math.PI / 2]) add(new THREE.BoxGeometry(w * 1.1, .05, .3), mat(p.cor), 0, H * .32, 0).rotation.y = a + .4;
+            } else if (p.id === 'garra') {
                 add(new THREE.BoxGeometry(w - .1, H * .45, d - .1), cor, 0, -H * .27, 0);
                 for (const x of [-w / 2 + .3, w / 2 - .3]) add(new THREE.BoxGeometry(.25, H * .55, d * .5), mat('#555'), x, H * .2, d * .2);
             } else {
@@ -419,7 +426,23 @@ function forma(p) {
                 add(new THREE.CylinderGeometry(.18, .18, .6, 12).rotateZ(Math.PI / 2), mat('#f76b15'), w / 2 + .2, 0, 0);
             }
             break;
+        case 'energia':
+            if (p.id === 'bobina') {         // fio de cobre enrolado, que brilha
+                add(new THREE.CylinderGeometry(.18, .18, H - .1, 12), mat('#555'));
+                for (let i = 0; i < 5; i++) add(new THREE.TorusGeometry(.3, .07, 8, 20).rotateX(Math.PI / 2), mat(p.cor, { metalness: .7, roughness: .3, emissive: '#ff9a3c', emissiveIntensity: .25 }), 0, -H / 2 + .35 + i * (H - .6) / 4, 0);
+            } else {                         // bateria: caixa com faixa e polos
+                add(new THREE.BoxGeometry(w - .08, H - .08, d - .08), mat('#1d2a24'));
+                add(new THREE.BoxGeometry(w - .04, H * .35, d - .04), cor);
+                for (const x of [-.45, .45]) add(new THREE.CylinderGeometry(.12, .12, .2, 10), mat(x < 0 ? '#d64545' : '#888'), x, H / 2 + .05, 0);
+            }
+            break;
         case 'sensor':
+            if (p.id === 'giroscopio') {
+                add(new THREE.SphereGeometry(.28, 16, 12), cor);
+                add(new THREE.TorusGeometry(.4, .04, 8, 24), mat('#999', { metalness: .8 })).rotation.x = Math.PI / 2;
+                add(new THREE.TorusGeometry(.4, .04, 8, 24), mat('#999', { metalness: .8 }));
+                break;
+            }
             add(new THREE.BoxGeometry(w - .06, H - .06, d - .06), cor);
             for (let i = 0; i < Math.max(1, w); i++) add(new THREE.CylinderGeometry(.22, .22, .2, 16).rotateX(Math.PI / 2), mat('#111a2b', { metalness: .3, roughness: .2 }), w === 1 ? 0 : (i ? .45 : -.45), 0, d / 2 + .05);
             break;
@@ -428,7 +451,10 @@ function forma(p) {
             add(new THREE.BoxGeometry(w * .7, .04, d * .45), mat('#18202a', { emissive: '#1b4fd6', emissiveIntensity: .35 }), 0, H / 2 - .01, -d * .15);
             break;
         case 'enfeite':
-            if (p.id === 'antena') {
+            if (p.id === 'bandeira') {
+                add(new THREE.CylinderGeometry(.06, .06, H, 10), mat('#bdbdbd'));
+                add(new THREE.BoxGeometry(.04, .8, 1.1), cor, 0, H / 2 - .45, .55);
+            } else if (p.id === 'antena') {
                 add(new THREE.CylinderGeometry(.07, .07, H - .3, 10), mat('#bdbdbd'), 0, -.15, 0);
                 add(new THREE.SphereGeometry(.22, 16, 12), mat('#ff4d4f', { emissive: '#ff4d4f', emissiveIntensity: .4 }), 0, H / 2 - .2, 0);
             } else add(new THREE.SphereGeometry(.38, 20, 14), mat(p.cor, { emissive: p.cor, emissiveIntensity: .6 }));
@@ -649,7 +675,7 @@ function ligar() {
     const rodas = pega(p => p.categoria === 'roda');
     const sensor = pega(p => p.id === 'sensor_distancia')[0];
 
-    const motores = pega(p => p.categoria === 'motor' && p.id !== 'garra').length;
+    const motores = pega(p => p.id === 'motor' || p.id === 'servo').length;
     let feixe = null;
     if (sensor) {   // o "olhar" do sensor: verde = livre, vermelho = perigo
         feixe = new THREE.Mesh(new THREE.BoxGeometry(.12, .12, 2.5), new THREE.MeshBasicMaterial({ color: 0x22cc66, transparent: true, opacity: .55 }));
@@ -757,11 +783,13 @@ function passoDaLuta(dt) {
     const xAtac = sou ? -6 : 6, xAlvo = -xAtac, f = L.t / DURACAO_GOLPE;
     const avanco = f < .4 ? f / .4 : Math.max(0, 1 - (f - .4) / .6);   // vai rápido, volta devagar
     // Cada golpe tem um jeito de se mexer
-    const alcance = { turbo: 4.6, atropelar: 4.2, laser: 1.2, pisca: 1.2 }[g.golpe] ?? 3.4;
+    const alcance = { turbo: 4.6, atropelar: 4.2, laser: 1.2, pisca: 1.2, choque: 2.6, giro: 3.8 }[g.golpe] ?? 3.4;
     atac.veiculo.position.x = xAtac + (sou ? 1 : -1) * alcance * Math.sin(avanco * Math.PI / 2);
-    atac.veiculo.position.y = g.golpe === 'martelada' ? Math.sin(Math.min(f / .4, 1) * Math.PI) * .9 : 0;   // pula e bate de cima
+    atac.veiculo.position.y = g.golpe === 'martelada' ? Math.sin(Math.min(f / .4, 1) * Math.PI) * .9   // pula e bate de cima
+        : g.golpe === 'rasante' ? Math.sin(Math.min(f, 1) * Math.PI) * 2.2 : 0;                            // voa por cima
+    atac.veiculo.traverse(o => { if (o.userData.gira) o.rotation.y += .6; });                              // o disco gira
     const doeu = g.acertou && f > .4 && f < .75;
-    alvo.veiculo.position.x = xAlvo + (doeu ? Math.sin(L.t * 70) * (g.efeito === 'critico' ? .35 : .18) : 0);
+    alvo.veiculo.position.x = xAlvo + (doeu ? Math.sin(L.t * 70) * (g.efeito === 'critico' || g.golpe === 'giro' ? .35 : .18) : 0);
     alvo.veiculo.position.y = doeu && g.golpe === 'atropelar' ? -.25 : 0;                                  // amassado!
     alvo.veiculo.rotation.x = doeu && g.efeito === 'tonto' ? Math.sin(L.t * 25) * .25 : 0;                  // fica tonto
     efeitoDeLuz(g, atac, alvo, f);
@@ -796,8 +824,10 @@ function efeitoDeLuz(g, atac, alvo, f) {
         const a = atac.veiculo.position, b = alvo.veiculo.position, fim = g.acertou ? b.x : b.x + (b.x > a.x ? 4 : -4);
         feixeLaser.scale.x = Math.abs(fim - a.x); feixeLaser.position.set((a.x + fim) / 2, 1.2, g.acertou ? 0 : .8);
     }
-    clarao.intensity = g.golpe === 'pisca' && ligado ? 60 * Math.abs(Math.sin(f * 40)) : 0;
-    clarao.position.set(atac.veiculo.position.x, 2.5, 0);
+    const brilha = (g.golpe === 'pisca' || (g.golpe === 'choque' && g.acertou)) && ligado;
+    clarao.color.setHex(g.golpe === 'choque' ? 0x7fd4ff : 0xfff3a0);
+    clarao.intensity = brilha ? 60 * Math.abs(Math.sin(f * 40)) : 0;
+    clarao.position.set((g.golpe === 'choque' ? alvo : atac).veiculo.position.x, 2.5, 0);
 }
 
 function sairDaLuta() {
@@ -953,7 +983,7 @@ async function desenharArena(c) {
     c.replaceChildren(el('h2', { textContent: '🤖 Seu robô' }));
     if (dados.meus_atributos) c.append(ficha(dados.meus_atributos));
     else c.append(el('p', { className: 'explica', textContent: '🔧 ' + maiuscula(dados.problema) + '. Monte na bancada e volte aqui!' }));
-    c.append(el('p', { className: 'explica', textContent: 'Cada peça muda a ficha: estrutura dá vida e defesa, garras e servos dão ataque, motores dão velocidade e sensores melhoram a mira. Peças especiais destravam golpes novos: garra, servo, 2 motores, esteira, sensor de distância e LED.' }),
+    c.append(el('p', { className: 'explica', textContent: 'Cada peça muda a ficha: estrutura dá vida e defesa, garras e servos dão ataque, motores dão velocidade e sensores melhoram a mira. Peças especiais destravam golpes novos: garra, servo, 2 motores, esteira, sensor de distância, LED, disco giratório, hélice e bobina de choque.' }),
         el('h2', { textContent: 'Rivais' }));
     for (const r of dados.rivais) {
         const b = el('button', { className: 'botao', textContent: '⚔️ Lutar!', disabled: !dados.meus_atributos, onclick: () => comecarLuta(r) });

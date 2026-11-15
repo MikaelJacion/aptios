@@ -45,6 +45,9 @@ MOVIMENTOS: dict[str, Movimento] = {
     "atropelar": Movimento("Atropelar", "🚜", "esteira", 1.3, -5, "Passa por cima do rival, igual a um trator."),
     "laser": Movimento("Mira laser", "🎯", "sensor_distancia", 1.0, 15, "Mede a distância e mira no ponto fraco: pode ser golpe crítico (dano dobrado)."),
     "pisca": Movimento("Pisca-pisca", "✨", "led", 0.5, 20, "Dano pequeno, mas ofusca: o próximo ataque do rival erra mais."),
+    "giro": Movimento("Disco giratório", "🌀", "disco", 1.8, -20, "O golpe mais forte de todos, mas erra bastante."),
+    "rasante": Movimento("Voo rasante", "🚁", "helice", 1.2, 10, "A hélice levanta o robô e ele ataca por cima."),
+    "choque": Movimento("Choque", "⚡", "bobina", 0.8, 5, "Faíscas! Muitas vezes deixa o rival tonto (perde a vez)."),
 }
 
 
@@ -61,8 +64,8 @@ class Rival:
 def calcular_atributos(robo: Iterable[PecaColocada], catalogo: Catalogo) -> Atributos:
     """Cada peça soma alguma coisa, como na vida real:
 
-    estrutura = mais vida e defesa · garra/servo/motor = ataque
-    motores e rodas = velocidade · sensores = mira (precisão)
+    estrutura e blindagem = mais vida e defesa · garra/servo/motor/disco = ataque
+    motores, rodas e bateria = velocidade · sensores, câmera e giroscópio = mira (precisão)
     """
     pecas = [catalogo.peca(c.peca_id) for c in robo]
     conta = lambda *ids: sum(1 for p in pecas if p.id in ids)
@@ -77,11 +80,13 @@ def calcular_atributos(robo: Iterable[PecaColocada], catalogo: Catalogo) -> Atri
     golpes = tuple(g for g, m in MOVIMENTOS.items()
                    if not m.peca or (conta(m.peca) >= (2 if m.peca == "motor" else 1)))
     return Atributos(
-        vida=min(60 + blocos * 2 + conta("esteira") * 15, 200),
-        ataque=min(6 + conta("garra") * 9 + conta("servo") * 5 + motores * 3, 60),
-        defesa=min(len(estrutura) * 2 + conta("esteira") * 4, 30),
-        velocidade=min(2 + motores * 3 + conta("roda_grande") * 2 - conta("esteira"), 20),
-        precisao=min(55 + conta("sensor_distancia") * 15 + conta("sensor_cor") * 8 + conta("sensor_toque") * 4, 95),
+        vida=min(60 + blocos * 2 + conta("esteira") * 15 + conta("bateria") * 10, 200),
+        ataque=min(6 + conta("garra") * 9 + conta("servo") * 5 + motores * 3
+                   + conta("disco") * 10 + conta("helice") * 3 + conta("bobina") * 4, 60),
+        defesa=min(len(estrutura) * 2 + conta("esteira") * 4 + conta("blindagem") * 4 + conta("giroscopio") * 2, 30),
+        velocidade=min(2 + motores * 3 + conta("roda_grande") * 2 - conta("esteira") + conta("bateria") * 3, 20),
+        precisao=min(55 + conta("sensor_distancia") * 15 + conta("sensor_cor") * 8 + conta("sensor_toque") * 4
+                     + conta("camera") * 12 + conta("giroscopio") * 6, 95),
         golpes=golpes,
     )
 
@@ -125,7 +130,7 @@ def lutar(voce: Atributos, rival: Atributos, semente: int, max_rodadas: int = 24
             dano = max(2, round(a.ataque * mov.dano) + extra - defesa + sorte.randint(0, 4))
             if nome == "laser" and sorte.random() < .3:
                 dano, efeito = dano * 2, "critico"
-            elif nome == "martelada" and sorte.random() < .3:
+            elif (nome == "martelada" and sorte.random() < .3) or (nome == "choque" and sorte.random() < .5):
                 efeito = "tonto"
             elif nome == "pisca":
                 efeito, ofuscado[alvo] = "ofuscado", True

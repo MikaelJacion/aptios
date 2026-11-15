@@ -27,6 +27,16 @@ PECAS = [
     Peca("garra", "Garra", "motor", 45, "#ffc53d", (2, 2, 2), "Pega e solta objetos."),
     Peca("led", "LED", "enfeite", 10, "#ff4d4f", (1, 1, 1), "Luzinha para o robô dar sinais."),
     Peca("antena", "Antena", "enfeite", 15, "#bdbdbd", (1, 3, 1), "Deixa o robô com cara de robô de verdade."),
+    # ── peças novas ──
+    Peca("placa_6x8", "Placa 6×8", "estrutura", 25, "#6b7280", (6, 1, 8), "Chassi gigante: cabe um robô de batalha inteiro."),
+    Peca("blindagem", "Blindagem", "estrutura", 35, "#9aa4b1", (2, 1, 4), "Chapa de metal. Os golpes doem bem menos (+defesa)."),
+    Peca("bateria", "Bateria extra", "energia", 30, "#2fbf71", (2, 1, 2), "Mais energia: o robô fica mais rápido e aguenta mais."),
+    Peca("bobina", "Bobina de choque", "energia", 40, "#c77d2e", (1, 2, 1), "Solta faíscas: o rival pode ficar tonto com o choque."),
+    Peca("disco", "Disco giratório", "motor", 50, "#c0c6cf", (2, 1, 2), "Um disco que gira muito rápido. Golpe fortíssimo, mas difícil de acertar."),
+    Peca("helice", "Hélice", "motor", 35, "#4fb3e8", (2, 1, 2), "Faz o robô dar um voo rasante por cima do rival."),
+    Peca("giroscopio", "Giroscópio", "sensor", 25, "#e0a800", (1, 1, 1), "Sente se o robô está torto. Mira melhor e mais firmeza."),
+    Peca("camera", "Câmera", "sensor", 40, "#222831", (2, 1, 1), "O robô enxerga o rival e mira muito melhor."),
+    Peca("bandeira", "Bandeira", "enfeite", 5, "#e5484d", (1, 4, 1), "Para o seu robô ter time!"),
 ]
 
 DESAFIOS = [

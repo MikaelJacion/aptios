@@ -195,3 +195,15 @@ def test_pecas_destravam_golpes():
     assert {"garrada", "martelada", "turbo", "laser"} <= set(golpes["mega_garra"])
     luta, _ = lutar(calcular_atributos(RIVAIS[7].pecas, CATALOGO), calcular_atributos(RIVAIS[0].pecas, CATALOGO), 3)
     assert all(g.golpe in golpes["mega_garra"] for g in luta if g.atacante == "voce")
+
+
+def test_pecas_novas_destravam_golpes_novos():
+    robo = [PecaColocada("placa_6x8", -3, 0, -4, 0), PecaColocada("controlador", -1, 1, -1, 0),
+            PecaColocada("roda_grande", -4, 0, -4, 0), PecaColocada("roda_grande", 3, 0, -4, 0),
+            PecaColocada("disco", -3, 1, 2, 0), PecaColocada("helice", 1, 1, 2, 0), PecaColocada("bobina", -3, 1, -4, 0),
+            PecaColocada("blindagem", 1, 1, -4, 0), PecaColocada("camera", -1, 1, -4, 0)]
+    from aptios.oficina.dominio import validar_encaixe
+    validar_encaixe(robo, CATALOGO)
+    a = calcular_atributos(robo, CATALOGO)
+    assert {"giro", "rasante", "choque"} <= set(a.golpes)
+    assert a.precisao >= 55 + 12 and a.defesa >= 4
