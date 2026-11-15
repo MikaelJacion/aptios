@@ -177,6 +177,10 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
     async def apagar(corpo: NomeDoRobo, x_explorador: str = Header("")) -> dict:
         return executar(oficina.apagar_robo, x_explorador, corpo.nome)
 
+    @app.get("/api/oficina/materiais")
+    async def materiais(x_explorador: str = Header("")) -> dict:
+        return executar(oficina.materiais, x_explorador)
+
     @app.get("/api/oficina/arena")
     async def arena(x_explorador: str = Header("")) -> dict:
         return executar(oficina.arena, x_explorador)
@@ -198,11 +202,12 @@ def criar_app(tutor: Tutor, oficina: Oficina, limite: LimiteDePerguntas | None =
 
 def _app_padrao() -> FastAPI:
     from aptios.oficina.catalogo import CATALOGO, PACOTES, RIVAIS
-    from aptios.oficina.infra import ExploradoresSQLite, PagamentoDesativado
+    from aptios.oficina.infra import ExploradoresSQLite, LinksDeAfiliado, PagamentoDesativado
     from aptios.tutor.claude import TutorClaude
 
     oficina = Oficina(CATALOGO, ExploradoresSQLite(os.environ.get("APTIOS_DB", "aptios.db")),
-                      PagamentoDesativado(), PACOTES, RIVAIS)
+                      PagamentoDesativado(), PACOTES, RIVAIS,
+                      LinksDeAfiliado(os.environ.get("APTIOS_LOJAS", os.path.expanduser("~/.config/aptios/lojas.json"))))
     return criar_app(TutorClaude(), oficina)
 
 

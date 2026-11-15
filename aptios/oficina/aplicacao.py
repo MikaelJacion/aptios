@@ -10,6 +10,7 @@ from dataclasses import asdict
 from typing import Any, Iterable, Mapping
 
 from aptios.oficina.batalha import MOVIMENTOS, Rival, calcular_atributos, lutar
+from aptios.oficina.componentes import COMPONENTES, PECA_PARA_COMPONENTES, UMA_POR_ROBO, LojasParceiras, lista_de_materiais
 from aptios.oficina.dominio import (
     Catalogo, Explorador, Exploradores, PacoteDeTokens, Pagamentos, PecaColocada, RegraDaOficina,
 )
@@ -22,12 +23,13 @@ class ExploradorNaoEncontrado(LookupError):
 class Oficina:
     def __init__(self, catalogo: Catalogo, exploradores: Exploradores,
                  pagamentos: Pagamentos, pacotes: Iterable[PacoteDeTokens],
-                 rivais: Iterable[Rival] = ()) -> None:
+                 rivais: Iterable[Rival] = (), lojas: LojasParceiras | None = None) -> None:
         self.catalogo = catalogo
         self.exploradores = exploradores
         self.pagamentos = pagamentos
         self.pacotes = {p.id: p for p in pacotes}
         self.rivais = {r.id: r for r in rivais}
+        self.lojas = lojas
 
     # ── consultas ───────────────────────────────────────────────
     def catalogo_publico(self) -> dict[str, Any]:
@@ -40,6 +42,10 @@ class Oficina:
             ],
             "pacotes": [asdict(p) for p in self.pacotes.values()],
             "golpes": {k: asdict(m) for k, m in MOVIMENTOS.items()},
+            # fichas técnicas: qual componente de verdade cada peça representa
+            "componentes": {k: asdict(c) for k, c in COMPONENTES.items()},
+            "peca_para_componentes": {k: [list(x) for x in v] for k, v in PECA_PARA_COMPONENTES.items()},
+            "uma_por_robo": sorted(UMA_POR_ROBO),
         }
 
     def estado(self, codigo: str) -> dict[str, Any]:
@@ -96,6 +102,17 @@ class Oficina:
         explorador.apagar_robo(nome)
         self.exploradores.salvar(explorador)
         return self._publico(explorador)
+
+    def materiais(self, codigo: str) -> dict[str, Any]:
+        """Lista de materiais do robô da bancada. Os links só vão se houver loja parceira."""
+        itens, avisos = lista_de_materiais(self._buscar(codigo).robo)
+        return {
+            "itens": [{"componente": c.componente.id, "nome": c.componente.nome, "quantidade": c.quantidade,
+                       "comprar": c.componente.comprar, "seguranca": c.componente.seguranca,
+                       "link": self.lojas.link(c.componente.id) if self.lojas and c.componente.comprar else None}
+                      for c in itens],
+            "avisos": avisos,
+        }
 
     def arena(self, codigo: str) -> dict[str, Any]:
         explorador = self._buscar(codigo)

@@ -240,3 +240,42 @@ def test_robos_salvos_sobrevivem_no_banco(tmp_path):
     estado = of.guardar_robo(cod, "Tanque")
     assert estado["robos_salvos"] == [{"nome": "Tanque", "pecas": 1}]
     assert repo.buscar(cod).robos_salvos["Tanque"][0].peca_id == "placa_4x6"
+
+
+
+def test_toda_peca_tem_componente_de_verdade():
+    from aptios.oficina.componentes import COMPONENTES, PECA_PARA_COMPONENTES
+    assert set(PECA_PARA_COMPONENTES) == set(CATALOGO.pecas)            # nenhuma peça esquecida
+    assert all(c in COMPONENTES for v in PECA_PARA_COMPONENTES.values() for c, _ in v)
+    assert all(c.seguranca for c in COMPONENTES.values() if not c.comprar and c.id != "enfeite")
+
+
+def test_lista_de_materiais_soma_e_ensina():
+    from aptios.oficina.componentes import lista_de_materiais
+    robo = [PecaColocada(p, 0, 0, 0, 0) for p in
+            ("placa_4x6", "bloco_2x2", "controlador", "roda_pequena", "roda_pequena", "motor", "motor", "motor", "esteira", "garra", "disco")]
+    itens, avisos = lista_de_materiais(robo)
+    q = {i.componente.id: i.quantidade for i in itens}
+    assert q["chassi"] == 1 and q["arduino_uno"] == 1             # 1 por robô, não importa quantas peças
+    assert q["l298n"] == 2                                         # 3 motores → 2 drivers (cada um controla 2)
+    assert q["esteira_kit"] == 1 and q["sg90"] == 1                # meia esteira arredonda para 1 kit
+    assert not itens[-1].componente.comprar                        # "só no jogo" vai para o fim da lista
+    assert any("bateria" in a for a in avisos)
+    _, avisos = lista_de_materiais([PecaColocada("roda_pequena", 0, 0, 0, 0)])
+    assert any("controlador" in a for a in avisos) and any("motores" in a for a in avisos)
+
+
+def test_links_de_afiliado_so_https_e_so_o_que_se_compra(tmp_path):
+    import json
+    from aptios.oficina.infra import LinksDeAfiliado
+    arq = tmp_path / "lojas.json"
+    arq.write_text(json.dumps({"hcsr04": {"loja": "Loja X", "url": "https://loja.example/hc"},
+                               "motor_tt": {"loja": "Loja Y", "url": "http://inseguro.example"},
+                               "disco_jogo": {"loja": "Loja Z", "url": "https://loja.example/disco"}}))
+    lojas = LinksDeAfiliado(str(arq))
+    assert lojas.link("hcsr04")["loja"] == "Loja X" and lojas.link("motor_tt") is None
+    of = Oficina(CATALOGO, ExploradoresEmMemoria(), PagamentoDesativado(), PACOTES, RIVAIS, lojas)
+    cod = of.novo_explorador()["codigo"]
+    of.salvar_robo(cod, [{"peca_id": "controlador", "x": 0, "y": 0, "z": 0, "giro": 0}])
+    assert of.materiais(cod)["itens"][0]["link"] is None           # arduino não tem link configurado
+    assert LinksDeAfiliado(None).link("hcsr04") is None            # sem arquivo, sem links

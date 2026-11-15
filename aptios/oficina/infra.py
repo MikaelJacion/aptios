@@ -88,3 +88,24 @@ class PagamentoDesativado:
         raise RegraDaOficina(
             "a compra de tokens ainda não está disponível. Por enquanto, ganhe tokens resolvendo desafios! 🧩"
         )
+
+
+class LinksDeAfiliado:
+    """ADAPTADOR da porta LojasParceiras: lê os links de um arquivo JSON.
+
+    Formato:  {"hcsr04": {"loja": "Nome da loja", "url": "https://..."}, ...}
+    Sem arquivo = sem links (é o padrão até a família se cadastrar em programas
+    de afiliados). Só aceitamos endereços https.
+    """
+
+    def __init__(self, caminho: str | None) -> None:
+        self._links: dict[str, dict[str, str]] = {}
+        if caminho and Path(caminho).exists():
+            dados = json.loads(Path(caminho).read_text(encoding="utf-8"))
+            for comp, info in dados.items():
+                url, loja = str(info.get("url", "")), str(info.get("loja", ""))[:40]
+                if url.startswith("https://") and loja:
+                    self._links[comp] = {"loja": loja, "url": url}
+
+    def link(self, componente_id: str) -> dict[str, str] | None:
+        return self._links.get(componente_id)

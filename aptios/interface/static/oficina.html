@@ -103,6 +103,18 @@ body {
 .peca[aria-pressed="true"] { border-color: var(--azul); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul) 22%, transparent); }
 .amostra { width: 28px; height: 28px; border-radius: 7px; border: 1px solid rgba(0,0,0,.15); }
 
+.ficha-tecnica { border: 1px solid var(--linha); border-radius: 12px; padding: 12px; display: grid; gap: 8px; margin-top: 12px; background: var(--fundo); }
+.ficha-tecnica h3 { margin: 0; font: 600 1rem var(--fonte-titulo); }
+.especs { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; margin: 0; font-size: .84rem; }
+.especs dt { color: var(--suave); }
+.especs dd { margin: 0; font-variant-numeric: tabular-nums; }
+.alerta { border-left: 3px solid var(--vermelho); padding: 4px 0 4px 10px; font-size: .86rem; }
+.selo-jogo { font: 600 .7rem var(--fonte-titulo); text-transform: uppercase; letter-spacing: .05em; background: color-mix(in srgb, var(--vermelho) 16%, transparent); color: var(--vermelho); border-radius: 6px; padding: 2px 7px; justify-self: start; }
+.lista-materiais { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: .9rem; }
+.lista-materiais li { display: grid; grid-template-columns: 2.4em minmax(0, 1fr); gap: 6px; align-items: start; }
+.lista-materiais b { font-variant-numeric: tabular-nums; }
+.porta-adulto { display: grid; gap: 8px; border: 1px dashed var(--linha); border-radius: 12px; padding: 12px; margin-top: 10px; }
+.botao.discreto { background: var(--fundo); color: var(--tinta); border: 1px solid var(--linha); }
 .guardar { display: flex; gap: 8px; margin: 10px 0 4px; }
 .guardar input { flex: 1; min-width: 0; font: inherit; border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; background: var(--fundo); color: var(--tinta); }
 .guardar input:focus-visible { outline: 3px solid var(--azul); outline-offset: 1px; }
@@ -252,6 +264,7 @@ function apiServidor() {
         guardarRobo: (nome) => req('POST', '/robos/guardar', { nome }),
         carregarRobo: (nome) => req('POST', '/robos/carregar', { nome }),
         apagarRobo: (nome) => req('POST', '/robos/apagar', { nome }),
+        materiais: () => req('GET', '/materiais'),
         comprarTokens: (id) => req('POST', '/tokens/' + id),
         arena: () => req('GET', '/arena'),
         batalhar: (id) => req('POST', '/batalhas/' + id),
@@ -340,6 +353,20 @@ function apiDemo({ catalogo, respostas, rivais }) {
             e.colecao[nome] = structuredClone(e.robo); return salvar();
         },
         async carregarRobo(nome) { nome = nomeValido(nome); if (!(nome in e.colecao)) erro('não achei um robô com esse nome'); e.robo = structuredClone(e.colecao[nome]); return salvar(); },
+        async materiais() {   // ⚠️ cópia de lista_de_materiais() de aptios/oficina/componentes.py
+            const soma = {};
+            for (const c of e.robo) for (const [comp, q] of catalogo.peca_para_componentes[c.peca_id] || []) soma[comp] = (soma[comp] || 0) + q;
+            for (const comp of catalogo.uma_por_robo) if (comp in soma) soma[comp] = 1;
+            const motores = soma.motor_tt || 0;
+            if (motores) soma.l298n = Math.ceil(motores / 2);
+            const avisos = [];
+            if (Object.keys(soma).length && !('arduino_uno' in soma)) avisos.push("Falta um controlador: sem o 'cérebro', nada funciona.");
+            if ((soma.roda_65 || soma.roda_grande) && !motores) avisos.push('Na vida real, as rodas precisam de motores para girar.');
+            if (motores && !('suporte_18650' in soma)) avisos.push('Motores gastam muita energia: coloque uma bateria extra no robô (ou use pilhas).');
+            const itens = Object.entries(soma).map(([k, v]) => { const c = catalogo.componentes[k]; return { componente: k, nome: c.nome, quantidade: Math.ceil(v), comprar: c.comprar, seguranca: c.seguranca, link: null }; })
+                .sort((a, b) => (a.comprar === b.comprar ? a.nome.localeCompare(b.nome) : a.comprar ? -1 : 1));
+            return { itens, avisos };
+        },
         async apagarRobo(nome) { nome = nomeValido(nome); if (!(nome in e.colecao)) erro('não achei um robô com esse nome'); delete e.colecao[nome]; return salvar(); },
         async arena() {
             let meus = null, problema = null;
@@ -896,6 +923,8 @@ function desenharPainel() {
             g.lastChild.setAttribute('aria-pressed', p.id === pecaAtual);
         }
         c.append(g);
+        const atual = catalogo.pecas.find(p => p.id === pecaAtual);
+        if (atual && catalogo.componentes) c.append(fichaTecnica(atual));
     }
     if (aba === 'robos') desenharColecao(c);
     if (aba === 'loja') {
@@ -908,7 +937,12 @@ function desenharPainel() {
                 try { eu = await api.comprar(p.id); await carregarModelo(p); mostrarSaldo(true); avisar(`🎉 Você ganhou: ${p.nome}!`); desenharPainel(); }
                 catch (e) { avisar('⚠️ ' + maiuscula(e.message)); }
             };
-            c.append(el('div', { className: 'item' }, amostra(p), el('div', {}, el('strong', { textContent: p.nome }), el('p', { textContent: p.descricao })), b));
+            const info = el('button', { className: 'botao pequeno discreto', textContent: 'ⓘ', title: 'Ficha técnica' });
+            info.setAttribute('aria-label', 'Ficha técnica: ' + p.nome);
+            const linha = el('div', { className: 'item' }, amostra(p), el('div', {}, el('strong', { textContent: p.nome }), el('p', { textContent: p.descricao })), el('div', { className: 'acoes' }, info, b));
+            const detalhe = el('div', { hidden: true }, fichaTecnica(p));
+            info.onclick = () => { detalhe.hidden = !detalhe.hidden; };
+            c.append(linha, detalhe);
         }
     }
     if (aba === 'desafios') {
@@ -961,6 +995,70 @@ function desenharPainel() {
         }
     }
 }
+// ── ficha técnica: a peça do jogo e o componente de verdade que ela representa ──
+function fichaTecnica(p) {
+    const caixa = el('div', { className: 'ficha-tecnica' }, el('h3', { textContent: `🔍 ${p.nome} na vida real` }));
+    for (const [id] of catalogo.peca_para_componentes?.[p.id] || []) {
+        const c = catalogo.componentes[id];
+        caixa.append(el('strong', { textContent: c.nome }));
+        if (!c.comprar && id !== 'enfeite') caixa.append(el('span', { className: 'selo-jogo', textContent: 'só no jogo' }));
+        const dl = el('dl', { className: 'especs' });
+        for (const [k, v] of c.especificacoes) dl.append(el('dt', { textContent: k }), el('dd', { textContent: v }));
+        caixa.append(dl, el('p', { className: 'explica', textContent: '💡 ' + c.aprender }));
+        if (c.seguranca) caixa.append(el('p', { className: 'alerta', textContent: '⚠️ ' + c.seguranca }));
+    }
+    return caixa;
+}
+
+// ── montar de verdade: lista de materiais + "porta para adultos" com os links de compra ──
+// As compras ficam atrás de uma pergunta que só um adulto responde rápido, e os links
+// são de lojas parceiras (afiliados). Veja o ADR-009.
+function montarDeVerdade() {
+    const area = el('div', { className: 'ficha-tecnica' },
+        el('h3', { textContent: '🛠 Montar de verdade' }),
+        el('p', { className: 'explica', textContent: 'Veja de quais peças de verdade você precisaria para construir o robô que está na bancada.' }));
+    const ver = el('button', { className: 'botao', textContent: '📋 Ver lista de materiais' });
+    const resultado = el('div');
+    ver.onclick = async () => {
+        if (travado()) return;
+        try { await salvarAgora(); mostrarLista(resultado, await api.materiais()); }
+        catch (e) { avisar('⚠️ ' + maiuscula(e.message)); }
+    };
+    area.append(ver, resultado);
+    return area;
+}
+function mostrarLista(caixa, { itens, avisos }) {
+    caixa.replaceChildren();
+    if (!itens.length) { caixa.append(el('p', { className: 'explica', textContent: 'A bancada está vazia. Monte um robô primeiro!' })); return; }
+    const ul = el('ul', { className: 'lista-materiais' });
+    for (const i of itens) ul.append(el('li', {}, el('b', { textContent: i.quantidade + '×' }),
+        el('span', { textContent: i.nome + (i.comprar ? '' : i.componente === 'enfeite' ? ' (faça você mesmo)' : ' (só no jogo!)') })));
+    caixa.append(ul);
+    for (const a of avisos) caixa.append(el('p', { className: 'explica', textContent: '🤔 ' + a }));
+    for (const s of new Set(itens.filter(i => i.seguranca).map(i => i.seguranca))) caixa.append(el('p', { className: 'alerta', textContent: '⚠️ ' + s }));
+    // porta para adultos
+    const a = 6 + Math.floor(Math.random() * 7), b = 6 + Math.floor(Math.random() * 7);
+    const porta = el('div', { className: 'porta-adulto' }, el('strong', { textContent: '👨‍👩‍👧 Área do responsável' }),
+        el('p', { className: 'explica', textContent: `Para ver onde comprar, um adulto responde: quanto é ${a} × ${b}?` }));
+    const campo = el('input', { inputMode: 'numeric', maxLength: 3, autocomplete: 'off' });
+    campo.setAttribute('aria-label', `Quanto é ${a} vezes ${b}`);
+    const ok = el('button', { className: 'botao pequeno', textContent: 'Entrar' });
+    const abrir = () => {
+        if (Number(campo.value) !== a * b) { avisar('Essa parte é para um adulto. 🙂'); campo.value = ''; return; }
+        const comLink = itens.filter(i => i.link);
+        porta.replaceChildren(el('strong', { textContent: '👨‍👩‍👧 Onde comprar' }));
+        if (!comLink.length) {
+            porta.append(el('p', { className: 'explica', textContent: 'Ainda não temos lojas parceiras. Quando tivermos, os links aparecem aqui. A lista acima já serve para pesquisar em qualquer loja de eletrônica ou robótica.' }));
+            return;
+        }
+        for (const i of comLink) porta.append(el('a', { href: i.link.url, target: '_blank', rel: 'noopener sponsored', className: 'link', textContent: `${i.quantidade}× ${i.nome}: comprar na ${i.link.loja} ↗` }));
+        porta.append(el('p', { className: 'explica', textContent: 'Transparência: estes são links de afiliado. Se você comprar por eles, a Aptios recebe uma pequena comissão, sem custo extra para você. O dinheiro ajuda a manter e melhorar a plataforma.' }));
+    };
+    ok.onclick = abrir; campo.onkeydown = (ev) => { if (ev.key === 'Enter') abrir(); };
+    porta.append(el('div', { className: 'guardar' }, campo, ok));
+    caixa.append(porta);
+}
+
 // ── coleção de robôs: guardar a bancada com um nome e trazer de volta depois ──
 function desenharColecao(c) {
     const lista = eu.robos_salvos || [];
@@ -977,6 +1075,7 @@ function desenharColecao(c) {
     guardar.onclick = acao;
     campo.onkeydown = (ev) => { if (ev.key === 'Enter') acao(); };
     c.append(el('div', { className: 'guardar' }, campo, guardar));
+    c.append(montarDeVerdade());
     if (!lista.length) { c.append(el('p', { className: 'explica', textContent: 'Você ainda não guardou nenhum robô.' })); return; }
     for (const r of lista) {
         const carregar = el('button', { className: 'botao pequeno', textContent: '📂 Carregar' });
