@@ -5,6 +5,8 @@ Se um dia trocarmos de IA, só este arquivo muda.
 """
 from __future__ import annotations
 
+import os
+
 import logging
 from typing import AsyncIterator
 
@@ -15,7 +17,10 @@ from aptios.tutor.prompt import prompt_do_sistema
 
 log = logging.getLogger(__name__)
 
-MODELO = "claude-opus-5-5"
+# Dá para trocar o modelo (e o tamanho máximo da resposta) sem mexer no código:
+# basta colocar APTIOS_MODELO=... e APTIOS_MAX_TOKENS=... em ~/.config/aptios/env
+MODELO = os.environ.get("APTIOS_MODELO", "claude-opus-5-5")
+MAX_TOKENS = int(os.environ.get("APTIOS_MAX_TOKENS", "16000"))
 
 AVISO_RECUSA = "\n\n🤖 Hmm, sobre isso eu não posso ajudar. Que tal voltarmos ao seu robô?"
 AVISO_FALHA = "\n\n🔧 Ops! Tive um probleminha para responder. Tente de novo daqui a pouco."
@@ -43,7 +48,7 @@ class TutorClaude:
         try:
             async with self._cliente.beta.messages.stream(
                 model=MODELO,
-                max_tokens=16000,
+                max_tokens=MAX_TOKENS,
                 system=prompt_do_sistema(conversa.kit),
                 messages=mensagens,
                 # "low" = respostas rápidas e mais baratas, ótimo para um chat.
